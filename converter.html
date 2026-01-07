@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>JINSUL - Smart Data Converter</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root { --primary: #333; --accent: #d73a49; --blue: #0052cc; --bg: #f6f6f7; --border: #ccc; }
+        body { margin: 0; background-color: var(--bg); color: var(--primary); font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; }
+        
+        .wm { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 0; }
+        .wm img { width: min(760px, 78vw); opacity: .20; filter: grayscale(1) saturate(0) brightness(.65) contrast(1.05); }
+
+        header { width: 100%; padding: 25px 0; text-align: center; position: relative; z-index: 1; }
+        .top-logo { width: 170px; filter: grayscale(1) brightness(.45) contrast(1.15); opacity: 0.8; }
+
+        .container { width: 900px; max-width: 95%; position: relative; z-index: 1; flex: 1; display: flex; flex-direction: column; gap: 20px; padding-bottom: 50px; }
+        .card { 
+            background: rgba(255, 255, 255, 0.6); 
+            backdrop-filter: blur(10px); 
+            border: 1px solid rgba(255,255,255,0.4);
+            border-radius: 16px; 
+            padding: 30px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            transition: 0.3s;
+        }
+
+        .step-title { font-size: 1.1em; font-weight: 800; margin-bottom: 15px; color: var(--primary); display: flex; align-items: center; gap: 8px; }
+        .step-num { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: var(--blue); color: white; border-radius: 50%; font-size: 14px; font-weight: 900; }
+
+        .type-selector { display: flex; gap: 10px; }
+        .type-btn {
+            flex: 1; padding: 15px 5px; border: 2px solid transparent; border-radius: 12px; background: rgba(255,255,255,0.5);
+            cursor: pointer; font-weight: 700; color: #666; transition: 0.2s; text-align: center;
+            display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 13px;
+        }
+        .type-btn:hover { background: rgba(255,255,255,0.8); transform: translateY(-2px); }
+        .type-btn.active { border-color: var(--blue); color: var(--blue); background: rgba(235, 245, 255, 0.8); box-shadow: 0 4px 12px rgba(0, 82, 204, 0.15); }
+        .type-icon { font-size: 24px; margin-bottom: 2px; }
+        .guide-box { margin-top: 15px; padding: 12px; background: rgba(0, 82, 204, 0.08); border-radius: 8px; font-size: 13px; color: var(--blue); font-weight: 600; line-height: 1.5; }
+
+        .drop-zone {
+            border: 2px dashed rgba(0,0,0,0.2); border-radius: 12px; padding: 40px; text-align: center;
+            transition: 0.3s; background: rgba(255,255,255,0.3); cursor: pointer;
+        }
+        /* 드래그 오버 시 스타일 (중요) */
+        .drop-zone.dragover { border-color: var(--blue); background: rgba(235, 245, 255, 0.8); transform: scale(1.02); }
+        
+        .dz-icon { font-size: 40px; color: rgba(0,0,0,0.2); margin-bottom: 10px; transition: 0.3s; }
+        .drop-zone.dragover .dz-icon { color: var(--blue); transform: scale(1.1); }
+        .dz-text { font-weight: 700; color: #666; }
+        #loadingSpinner { display: none; margin-top: 10px; color: var(--blue); font-weight: 700; }
+
+        #reviewSection { display: none; }
+        .review-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 20px; }
+        .review-item { background: rgba(255,255,255,0.5); padding: 15px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.1); }
+        .label-tag { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 800; margin-bottom: 10px; }
+        .tag-code { background: #e3f2fd; color: var(--blue); }
+        .tag-name { background: #e8f5e9; color: #2e7d32; }
+        .tag-price { background: #fff3e0; color: #ef6c00; }
+        .col-select { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ccc; outline: none; font-weight: 600; cursor: pointer; }
+        .preview-val { font-size: 12px; color: #888; margin-top: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        
+        .save-btn {
+            width: 100%; padding: 18px; background: var(--blue); color: white; border: none; border-radius: 12px;
+            font-weight: 900; font-size: 16px; cursor: pointer; transition: 0.2s; margin-top: 25px;
+            box-shadow: 0 4px 15px rgba(0, 82, 204, 0.3);
+        }
+        .save-btn:hover { background: #0040a0; transform: translateY(-2px); }
+        .save-btn:disabled { background: #ccc; cursor: not-allowed; box-shadow: none; transform: none; }
+
+        footer { width: 100%; text-align: center; padding: 30px 0 50px; font-size: 12px; color: #888; font-weight: 600; }
+    </style>
+</head>
+<body>
+
+<div class="wm"><img src="https://raw.githubusercontent.com/jinsul-lab/openteam/main/jinsul-logo.png"></div>
+<header><img src="https://raw.githubusercontent.com/jinsul-lab/openteam/main/jinsul-logo.png" class="top-logo"></header>
+
+<div class="container">
+    <div class="card">
+        <div class="step-title"><span class="step-num">1</span>변환할 파일 타입을 선택하세요</div>
+        <div class="type-selector">
+            <div class="type-btn active" onclick="selectType('fee')"><span class="type-icon">🏥</span>수가 파일</div>
+            <div class="type-btn" onclick="selectType('drug')"><span class="type-icon">💊</span>약가 파일</div>
+            <div class="type-btn" onclick="selectType('mat')"><span class="type-icon">💉</span>치료재료</div>
+            <div class="type-btn" style="background: rgba(215, 58, 73, 0.1); color: var(--accent);" onclick="selectType('set')"><span class="type-icon">📋</span>묶음처방<br>(약속처방)</div>
+        </div>
+        <div class="guide-box" id="guideText">💡 팁: 수가 파일에는 <b>[코드], [명칭], [의원단가]</b> 정보가 반드시 포함되어야 합니다.</div>
+    </div>
+
+    <div class="card">
+        <div class="step-title"><span class="step-num">2</span>엑셀(xls, xlsx) 또는 텍스트(txt, csv) 파일을 올려주세요</div>
+        <div id="dropZone" class="drop-zone">
+            <div class="dz-icon">📂</div>
+            <div class="dz-text">여기에 파일을 끌어다 놓거나 클릭하세요</div>
+            <div id="loadingSpinner">🔄 데이터를 정밀 분석 중입니다...</div>
+        </div>
+        <input type="file" id="fileInput" style="display: none;" accept=".xlsx, .xls, .csv, .txt">
+    </div>
+
+    <div class="card" id="reviewSection">
+        <div class="step-title"><span class="step-num">3</span>AI 분석 결과를 확인하고 저장하세요</div>
+        <p style="font-size:13px; color:#666; margin-bottom:20px;" id="reviewDesc">🤖 파일 내용을 분석하여 가장 유력한 열(Column)을 자동으로 선택했습니다.<br>틀렸다면 드롭다운을 눌러 올바른 열을 지정해주세요.</p>
+        
+        <div id="reviewGrid" class="review-grid"></div>
+        
+        <button id="saveBtn" class="save-btn" disabled>💾 JSON 파일로 저장하기</button>
+    </div>
+</div>
+
+<footer>© JINSUL · 경험과 가치를 현실화하는 컨설팅</footer>
+
+<script>
+    let currentType = 'fee';
+    let analyzedData = null;
+    let headerList = [];
+    let detectedIndices = { code: -1, name: -1, price: -1 };
+    let finalSetData = null;
+
+    const guides = {
+        fee: "💡 팁: 수가 파일은 <b>[코드], [명칭], [의원단가]</b>를 우선적으로 찾습니다.",
+        drug: "💡 팁: 약가 파일은 <b>[코드], [제품명], [상한금액]</b> 정보를 찾습니다.",
+        mat: "💡 팁: 치료재료 파일은 <b>[코드], [품명], [상한금액]</b> 정보를 찾습니다.",
+        set: "💡 팁: 묶음처방(약속처방) 파일을 올리면 자동으로 변환 준비를 마칩니다."
+    };
+
+    function selectType(type) {
+        currentType = type;
+        document.querySelectorAll('.type-btn').forEach(btn => btn.classList.remove('active'));
+        event.currentTarget.classList.add('active');
+        document.getElementById('guideText').innerHTML = guides[type];
+        resetUI();
+    }
+
+    function resetUI() {
+        document.getElementById('reviewSection').style.display = 'none';
+        document.getElementById('saveBtn').disabled = true;
+        document.getElementById('saveBtn').innerText = "💾 JSON 파일로 저장하기";
+        document.getElementById('saveBtn').onclick = null;
+        analyzedData = null;
+        finalSetData = null;
+    }
+
+    // [핵심 수정] 드래그 앤 드롭 이벤트 핸들링 강화
+    const dz = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+
+    // 기본 동작 방지 함수 (파일 열기 방지)
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    // 드롭존 및 전체 화면에 이벤트 걸기 (놓치는 경우 방지)
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dz.addEventListener(eventName, preventDefaults, false);
+        document.body.addEventListener(eventName, preventDefaults, false);
+    });
+
+    // 드래그 들어왔을 때 효과
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dz.addEventListener(eventName, () => dz.classList.add('dragover'), false);
+    });
+
+    // 드래그 나갔거나 놓았을 때 효과 해제
+    ['dragleave', 'drop'].forEach(eventName => {
+        dz.addEventListener(eventName, () => dz.classList.remove('dragover'), false);
+    });
+
+    // 파일 놓았을 때 처리
+    dz.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        handleFile(files[0]);
+    });
+
+    // 클릭해서 파일 선택
+    dz.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+
+    async function handleFile(file) {
+        if (!file) return;
+        dz.querySelector('.dz-text').style.display = 'none';
+        document.getElementById('loadingSpinner').style.display = 'block';
+
+        try {
+            if (currentType === 'set') {
+                await processSetFile(file);
+            } else {
+                await processDataFile(file);
+            }
+        } catch (e) {
+            alert("❌ 파일 분석 중 오류가 발생했습니다.\n" + e.message);
+            resetUI();
+        } finally {
+            dz.querySelector('.dz-text').style.display = 'block';
+            document.getElementById('loadingSpinner').style.display = 'none';
+        }
+    }
+
+    function readFile(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    let workbook;
+                    if (file.name.toLowerCase().endsWith('.csv') || file.name.toLowerCase().endsWith('.txt')) {
+                        let text = new TextDecoder('euc-kr').decode(data);
+                        if (text.includes('')) {
+                            text = new TextDecoder('utf-8').decode(data);
+                        }
+                        workbook = XLSX.read(text, { type: 'string' });
+                    } else {
+                        workbook = XLSX.read(data, { type: 'array' });
+                    }
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' });
+                    resolve(jsonData);
+                } catch (err) { reject(err); }
+            };
+            reader.readAsArrayBuffer(file);
+        });
+    }
+
+    function getColLabel(i) {
+        const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        if(i < 26) return letters[i];
+        return letters[Math.floor(i/26)-1] + letters[i%26];
+    }
+
+    async function processDataFile(file) {
+        const rawData = await readFile(file);
+        if (!rawData || rawData.length < 2) throw new Error("데이터가 너무 적습니다.");
+
+        const analysis = analyzeDataStructure(rawData, currentType);
+        analyzedData = analysis.dataBody;
+        headerList = analysis.headers;
+        detectedIndices = analysis.bestIndices;
+
+        renderReviewUI();
+    }
+
+    function analyzeDataStructure(rawData, type) {
+        const keywords = ['코드', '명칭', '품명', '한글', '단가', '금액', '가격', '상한'];
+        let bestHeaderRowIdx = 0;
+        let maxScore = -1;
+
+        for (let i = 0; i < Math.min(rawData.length, 10); i++) {
+            let score = 0;
+            rawData[i].forEach(cell => {
+                if (typeof cell === 'string' && keywords.some(k => cell.includes(k))) score++;
+            });
+            if (score > maxScore) { maxScore = score; bestHeaderRowIdx = i; }
+        }
+
+        const headers = rawData[bestHeaderRowIdx].map(h => String(h).trim());
+        const dataBody = rawData.slice(bestHeaderRowIdx + 1);
+        const sampleData = dataBody.slice(0, 10); 
+
+        const scores = { code: [], name: [], price: [] };
+        headers.forEach(() => { scores.code.push(0); scores.name.push(0); scores.price.push(0); });
+
+        const synonyms = {
+            code: ['코드', '기호'],
+            name: ['명칭', '품명', '한글', '제품'],
+            price: ['단가', '금액', '가격', '상한']
+        };
+
+        headers.forEach((h, colIdx) => {
+            if (synonyms.code.some(s => h.includes(s))) scores.code[colIdx] += 10;
+            if (synonyms.name.some(s => h.includes(s))) scores.name[colIdx] += 10;
+            
+            if (synonyms.price.some(s => h.includes(s))) {
+                scores.price[colIdx] += 5;
+                if (type === 'fee' && h.includes('의원')) scores.price[colIdx] += 20; 
+                if (type !== 'fee' && h.includes('상한')) scores.price[colIdx] += 15; 
+            }
+
+            let numCount = 0, strCount = 0, codeLikeCount = 0, dateCount = 0;
+            
+            sampleData.forEach(row => {
+                const val = row[colIdx];
+                if (!val) return;
+                const strVal = String(val).replace(/,/g, '').trim();
+                const numVal = parseFloat(strVal);
+
+                if (/^20\d{6}$/.test(strVal)) { 
+                    dateCount++; 
+                    return; 
+                }
+
+                if (!isNaN(numVal) && isFinite(strVal)) {
+                    if (numVal > 10000000) {
+                        codeLikeCount++;
+                    } else {
+                        numCount++;
+                    }
+                } 
+                else {
+                    if (/[가-힣]/.test(strVal)) strCount++; 
+                    if (/[a-zA-Z]/.test(strVal) && /\d/.test(strVal)) codeLikeCount++; 
+                }
+            });
+
+            if (dateCount > 0) { 
+                scores.price[colIdx] -= 50; 
+                scores.code[colIdx] -= 20; 
+            }
+            if (numCount > 0) scores.price[colIdx] += numCount * 2;
+            if (strCount > 0) scores.name[colIdx] += strCount * 2;
+            if (codeLikeCount > 0) scores.code[colIdx] += codeLikeCount * 2;
+            
+            if (numCount > 0 && headers[colIdx].includes('코드')) scores.code[colIdx] += 20;
+        });
+
+        const getBestIndex = (scoreArray) => scoreArray.indexOf(Math.max(...scoreArray));
+        return {
+            headers: headers,
+            dataBody: dataBody,
+            bestIndices: {
+                code: getBestIndex(scores.code),
+                name: getBestIndex(scores.name),
+                price: getBestIndex(scores.price)
+            }
+        };
+    }
+
+    function renderReviewUI() {
+        const grid = document.getElementById('reviewGrid');
+        grid.innerHTML = '';
+        document.getElementById('reviewDesc').style.display = 'block';
+
+        const fields = [
+            { key: 'code', label: '코드 열 (필수)', tagClass: 'tag-code' },
+            { key: 'name', label: '명칭 열 (필수)', tagClass: 'tag-name' },
+            { key: 'price', label: '단가 열 (필수)', tagClass: 'tag-price' }
+        ];
+
+        fields.forEach(field => {
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'review-item';
+            
+            let optionsHtml = headerList.map((h, i) => {
+                const colLabel = getColLabel(i);
+                return `<option value="${i}" ${i === detectedIndices[field.key] ? 'selected' : ''}>[${colLabel}열] ${h}</option>`;
+            }).join('');
+            
+            const bestIdx = detectedIndices[field.key];
+            const previewRow = analyzedData.find(row => row[bestIdx]) || [];
+            const previewVal = previewRow[bestIdx] || '(데이터 없음)';
+
+            itemDiv.innerHTML = `
+                <span class="label-tag ${field.tagClass}">${field.label}</span>
+                <select id="sel_${field.key}" class="col-select">${optionsHtml}</select>
+                <div class="preview-val" id="prev_${field.key}">미리보기: ${previewVal}</div>
+            `;
+            grid.appendChild(itemDiv);
+
+            document.getElementById(`sel_${field.key}`).addEventListener('change', (e) => {
+                const newIdx = parseInt(e.target.value);
+                const newPreviewRow = analyzedData.find(row => row[newIdx]) || [];
+                document.getElementById(`prev_${field.key}`).innerText = `미리보기: ${newPreviewRow[newIdx] || '(데이터 없음)'}`;
+            });
+        });
+
+        document.getElementById('reviewSection').style.display = 'block';
+        document.getElementById('saveBtn').disabled = false;
+        document.getElementById('saveBtn').innerText = `💾 ${currentType}.json 파일로 저장하기`;
+        document.getElementById('saveBtn').onclick = saveDataFile;
+    }
+
+    function saveDataFile() {
+        const finalIndices = {
+            code: parseInt(document.getElementById('sel_code').value),
+            name: parseInt(document.getElementById('sel_name').value),
+            price: parseInt(document.getElementById('sel_price').value)
+        };
+
+        const resultDB = {};
+        let count = 0;
+        
+        analyzedData.forEach(row => {
+            const code = String(row[finalIndices.code] || '').trim().toUpperCase();
+            const name = String(row[finalIndices.name] || '').trim();
+            const priceStr = String(row[finalIndices.price] || '0').replace(/,/g, '').trim();
+            const price = parseFloat(priceStr) || 0;
+
+            if (code && code.length > 1 && name && !code.includes('코드')) {
+                resultDB[code] = [name, price];
+                count++;
+            }
+        });
+
+        if (count === 0) { alert("저장할 데이터가 없습니다."); return; }
+
+        const finalOutput = {
+            data: resultDB,
+            date: new Date().toISOString().slice(0, 10),
+            type: currentType
+        };
+
+        downloadJSON(finalOutput, `${currentType}.json`);
+        alert(`✅ ${count}건의 데이터가 ${currentType}.json 파일로 저장되었습니다.`);
+        resetUI();
+    }
+
+    async function processSetFile(file) {
+        const rawData = await readFile(file);
+        const setData = {};
+        let currentSetCode = "", currentSetName = "";
+
+        rawData.forEach(row => {
+            const setCodeCol = row[0];
+            const setNameCol = row[1];
+            const typeCol = row[2];
+            const itemCode = String(row[3] || '').trim();
+            const itemName = String(row[4] || '').trim();
+            const nbCol = String(row[9] || '');
+
+            if (setCodeCol && !setCodeCol.includes('묶음코드') && !setCodeCol.includes('▶')) {
+                currentSetCode = setCodeCol; currentSetName = setNameCol;
+                if (!setData[currentSetCode]) setData[currentSetCode] = { n: currentSetName, it: [], dg: [], cc: [] };
+            }
+
+            if (!currentSetCode || !itemCode || itemCode.length < 2) return;
+
+            if (typeCol && typeCol.includes("증상")) {
+                if (itemName && !setData[currentSetCode].cc.includes(itemName)) setData[currentSetCode].cc.push(itemName);
+            } else if (typeCol && typeCol.includes("상병")) {
+                if (!setData[currentSetCode].dg.some(d => d.c === itemCode)) setData[currentSetCode].dg.push({ c: itemCode, n: itemName });
+            } else if (!typeCol || (!typeCol.includes("항") && !typeCol.includes("목"))) {
+                const qty = parseFloat(row[5]) || 1;
+                const isNB = nbCol.includes('비급여') || nbCol.includes('100/100');
+                setData[currentSetCode].it.push({ c: itemCode, n: itemName, q: qty, nb: isNB });
+            }
+        });
+
+        const count = Object.keys(setData).length;
+        if (count === 0) throw new Error("세트 데이터를 찾을 수 없습니다.");
+        
+        finalSetData = setData; 
+        
+        document.getElementById('reviewSection').style.display = 'block';
+        document.getElementById('reviewGrid').innerHTML = `<div style="text-align:center; padding:20px; font-weight:700; color:#2e7d32;">✅ ${count}개의 묶음처방이 분석되었습니다.<br>아래 버튼을 눌러 저장하세요.</div>`;
+        document.getElementById('reviewDesc').style.display = 'none';
+        
+        const btn = document.getElementById('saveBtn');
+        btn.disabled = false;
+        btn.innerText = "💾 set.json 파일로 저장하기";
+        btn.onclick = () => {
+            downloadJSON(finalSetData, 'set.json');
+            alert("✅ 저장되었습니다. 병원에 맞게 파일명을 변경하여 사용하세요. (예: set_busan.json)");
+            resetUI();
+        };
+    }
+
+    function downloadJSON(data, filename) {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
+        const a = document.createElement('a');
+        a.href = dataStr;
+        a.download = filename;
+        document.body.appendChild(a); a.click(); a.remove();
+    }
+</script>
+</body>
+</html>

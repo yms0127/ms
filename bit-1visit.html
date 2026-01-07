@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>비트 1회 내원 통계 (주사내원 추가)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    :root{
+      --bg:#f6f6f7; --card:#ffffff; --text:#111827; --muted:#6b7280;
+      --border:#e5e7eb; --thead:#f3f4f6; --hover:#f9fafb; --group:#cbd5e1;
+    }
+    *{box-sizing:border-box}
+    body{ margin:0; background:var(--bg); color:var(--text);
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,'Apple SD Gothic Neo','Noto Sans KR',Arial,sans-serif;}
+    header{padding:24px 16px 0; text-align:center;}
+    h1{margin:0 0 6px; font-size:24px; font-weight:800; color:#0f172a}
+    p.sub{margin:0; color:var(--muted); font-size:13px}
+    .wrap{padding:16px; max-width:1200px; margin:0 auto}
+    .card{background:var(--card); border:1px solid var(--border); border-radius:14px; padding:14px;
+      box-shadow:0 2px 6px rgba(0,0,0,.05); margin-top:12px}
+    .card-title{margin:0 0 8px; font-weight:700; color:#111827}
+    
+    /* Grid & Input Layout */
+    .grid{display:grid; gap:16px; grid-template-columns: 1fr 1fr}
+    @media (max-width: 860px){ .grid{grid-template-columns:1fr} }
+
+    label{display:block; font-size:12px; font-weight:600; color:var(--muted); margin-bottom:6px}
+    label+label{font-weight:400; color:#64748b; margin-top:6px}
+
+    input[type=file], input[type=text]{
+      width:100%; padding:10px; border-radius:10px; border:1px dashed var(--border); background:#fff; color:var(--text);
+    }
+    
+    /* Buttons */
+    .btnrow{display:flex; gap:8px; justify-content:flex-end; align-items:end; flex-wrap:wrap}
+    button{
+      height:38px; border-radius:10px; border:1px solid var(--border);
+      background:radial-gradient(120% 120% at 0% 0%,rgba(34,211,238,.25),rgba(34,211,238,.1));
+      color:#0f172a; font-weight:700; cursor:pointer; padding:0 12px;
+    }
+    button.secondary{background:#fff}
+    button:disabled{opacity:.5; cursor:not-allowed}
+    .warn{color:#b91c1c; font-weight:700; margin-top:10px}
+
+    /* Tables */
+    .table-card{overflow:auto; margin-top:10px}
+    table{ width:100%; border-collapse:collapse; table-layout:fixed;
+      background:#fff; border:1px solid var(--border); border-radius:12px; overflow:hidden;}
+    th, td{
+      padding:10px 8px; text-align:center; word-break:keep-all; white-space:normal;
+      border-bottom:1px solid var(--border); font-size:12px;
+    }
+    th{position:sticky; top:0; z-index:1; background:var(--thead); color:#0f172a}
+    tbody tr:hover td{background:var(--hover)}
+    tbody td[rowspan]{ border-top:3px solid var(--group) !important; }
+    tbody tr:first-child td[rowspan]{ border-top:1px solid var(--border) !important; }
+    
+    /* Modal */
+    .modal-backdrop{position:fixed; inset:0; background:rgba(0,0,0,.35); display:none; align-items:center; justify-content:center; padding:16px; z-index:50}
+    .modal{background:#fff; border:1px solid var(--border); border-radius:14px; width:min(1100px, 100%); max-height:85vh; overflow:auto; box-shadow:0 10px 40px rgba(0,0,0,.2); }
+    .modal-header{display:flex; justify-content:space-between; align-items:center; padding:14px 14px 10px; border-bottom:1px solid var(--border)}
+    .modal-title{font-weight:800}
+    .modal-body{padding:12px 14px 14px}
+    .modal-actions{display:flex; gap:8px; flex-wrap:wrap}
+    .pill{display:inline-block; font-size:12px; padding:4px 8px; border-radius:999px; border:1px solid var(--border); color:var(--muted)}
+    .mode-active{border-color:#0ea5e9; box-shadow:0 0 0 2px rgba(14,165,233,.15) inset}
+
+    /* ===== JINSUL 디자인 통합 (의사랑 버전과 동일하게 적용) ===== */
+    header .logo{
+      width:170px; max-width:70vw; height:auto; display:block; margin:0 auto 10px;
+      filter: grayscale(1) saturate(0) brightness(.45) contrast(1.15);
+    }
+    .wm{
+      position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+      pointer-events:none; z-index:0;
+    }
+    .wm img{
+      width:min(760px, 78vw); opacity:.075; user-select:none;
+      filter: grayscale(1) saturate(0) brightness(.65) contrast(1.05);
+    }
+    body > *{ position:relative; z-index:1; }
+    
+    /* 배경 투명화 처리 (워터마크 보이게) */
+    table, .table-card, .card, .modal { background: rgba(255,255,255,.10) !important; } // 워터마크 로고 투명도
+  </style>
+</head>
+<body>
+  <div class="wm" aria-hidden="true"><img src="jinsul-logo.png" alt=""></div>
+  <header>
+    <img src="jinsul-logo.png" alt="JINSUL" class="logo" />
+    <h1>비트 1회 내원 확인</h1>
+    <p class="sub">초진 및 기간 전체 주사 1회 확인</p>
+  </header>
+
+  <div class="wrap">
+    <div class="card">
+      <div class="grid">
+        <div>
+          <label>외래진료실➡️외래환자➡️기간설정➡️검색➡️Excel내려받기</label>
+          <label>※ CSV / XLSX / XLS 모두 지원 (CSV는 UTF-8·EUC-KR 자동 인식)</label>
+          <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" />
+        </div>
+        <div class="btnrow">
+          <button id="pickBtn" onclick="document.getElementById('fileInput').click()">파일 선택</button>
+          <button id="oneshotBtn" class="secondary" disabled>주사 1회자 보기</button>
+          <button id="oneshotDlBtn" class="secondary" disabled>1회자 다운로드</button>
+          <button id="printBtn" class="secondary" onclick="window.print()">인쇄</button>
+        </div>
+      </div>
+
+      <div style="margin-top:10px; display:grid; gap:10px; grid-template-columns: 1fr 1fr auto;">
+        <div style="grid-column: 1 / span 2;">
+          <label>내원경로 파일(통계➡️내원경로통계➡️집계➡️파일로 내려받기)</label>
+          <label>내원경로 파일 업로드</label>
+          <input type="file" id="routeFileInput" accept=".xls,.xlsx,.csv" />
+        </div>
+        <div class="btnrow" style="justify-content:flex-end">
+          <button id="routeStatusBtn" class="secondary" disabled>내원경로: 미업로드</button>
+        </div>
+      </div>
+
+      <p style="color:var(--muted);font-size:12px;margin:8px 0 0">⚠️ 모든 데이터는 브라우저 내에서만 처리됩니다.</p>
+    </div>
+
+    <div class="card table-card" style="display:none">
+      <h3 class="card-title">요약 통계 (전체 / 각 진료실)</h3>
+      <div id="summaryOutput"></div>
+    </div>
+
+    <div class="card table-card" style="display:none">
+      <h3 class="card-title">연령대별 통계 (진료실별)</h3>
+      <div id="output"></div>
+      <div id="warning" class="warn"></div>
+    </div>
+
+    <div id="oneshotModal" class="card table-card" style="display:none">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">주사 1회자 목록</div>
+          <div class="pill">기준: 기간 내 “마취(주사) 칸에 ●”가 정확히 1번인 차트</div>
+        </div>
+        <div class="modal-actions">
+          <button class="secondary" id="modeAllBtn">전체 1회</button>
+          <button class="secondary" id="modeNewBtn">신환 1회</button>
+          <button class="secondary" id="modalDlBtn">다운로드(xlsx)</button>
+          <button class="secondary" id="modalCloseBtn">닫기</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div id="oneshotMeta" style="margin-bottom:10px;color:var(--muted);font-size:12px"></div>
+        <div id="oneshotTable"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  /* ================= 공통 유틸 ================= */
+  const AGE_ORDER = ["0~10대","20대","30대","40대","50대","60대","70대이상","전체"];
+  const state = { df:null, col:null, oneshotRows:[], oneshotNewRows:[], oneshotMode:'all', routeMap:null };
+
+  function stripBOM(s){ return s && s.charCodeAt(0)===0xFEFF ? s.slice(1) : s; }
+  function detectDelimiter(sampleText){
+    const line=(sampleText.split(/\r?\n/).find(l=>l.trim().length)||'');
+    const cands=[',',';','\t','|']; let best=',',max=-1;
+    for(const c of cands){
+      const n=(line.match(new RegExp('\\'+c,'g'))||[]).length;
+      if(n>max){max=n;best=c;}
+    }
+    return best;
+  }
+  
+  /* ================= 내원경로(환자정보) 파일 ================= */
+  function buildRouteMapFromRows(rows){
+    const map = new Map();
+    if(!rows || !rows.length) return map;
+
+    for(let i=0;i<rows.length;i++){
+      const r = rows[i] || [];
+      const chart = String(r[1] ?? "").trim();   // B
+      if(!chart || chart.toLowerCase()==="차트번호" || chart.toLowerCase()==="chart") continue;
+
+      const name  = String(r[2] ?? "").trim();   // C
+      const phone = String(r[11] ?? "").trim();  // L
+      if(!map.has(chart)){
+        map.set(chart, { chart, name, phone });
+      }else{
+        const cur = map.get(chart);
+        if(!cur.name && name) cur.name = name;
+        if(!cur.phone && phone) cur.phone = phone;
+      }
+    }
+    return map;
+  }
+
+  async function loadRouteFileToMap(file){
+    let rawData=[];
+    const isCSV=/\.csv$/i.test(file.name);
+    if(isCSV){
+      const text = await file.text();
+      rawData = smartCSVtoRows(text);
+    }else{
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf,{type:'array'});
+      wb.SheetNames.forEach(sheet=>{
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheet],{header:1,defval:""});
+        rawData = rawData.concat(rows);
+      });
+    }
+    return buildRouteMapFromRows(rawData);
+  }
+
+  function withPhone(list){
+    if(!state.routeMap) return list;
+    return (list||[]).map(row=>{
+      const id = String(row["차트번호"] ?? "").trim();
+      const info = state.routeMap.get(id);
+      const phone = info ? (info.phone || "") : "";
+      const nameFromRoute = info ? (info.name || "") : "";
+      const out = Object.assign({}, row);
+      if((out["수진자명"]==null || String(out["수진자명"]).trim()==="") && nameFromRoute){
+        out["수진자명"] = nameFromRoute;
+      }
+      out["휴대폰"] = phone;
+      if(out["환자명"]==null || String(out["환자명"]).trim()===""){
+        out["환자명"] = out["수진자명"] || "";
+      }
+      return out;
+    });
+  }
+  
+  function smartCSVtoRows(csvText){
+    const txt=stripBOM(csvText); const FS=detectDelimiter(txt);
+    const wb=XLSX.read(txt,{type:'string',FS});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    return XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
+  }
+  function findHeaderIndex(rows){
+    return rows.findIndex(row=>{
+      const cells=row.map(c=>String(c||'').toLowerCase());
+      const hasFirstRevisit=cells.some(c=>/초\s*\/?\s*재|신환|재진|90일초진/.test(c));
+      const hasChart=cells.some(c=>/차트|챠트|차트.?번호|환자.?번호|등록번호|id/.test(c));
+      const hasDept=cells.some(c=>/진료.?과|과목|외래.?진료.?실/.test(c));
+      return hasFirstRevisit && (hasChart||hasDept);
+    });
+  }
+  function getAgeGroup(raw){
+    if(!raw || typeof raw!=='string') return "전체";
+    const match=raw.match(/(\d{1,3})세/); const age=match?parseInt(match[1]):NaN;
+    if(isNaN(age)) return "전체";
+    if(age<=19) return "0~10대";
+    if(age<=29) return "20대";
+    if(age<=39) return "30대";
+    if(age<=49) return "40대";
+    if(age<=59) return "50대";
+    if(age<=69) return "60대";
+    return "70대이상";
+  }
+  function parseAge(val){
+    if(val===null||val===undefined) return null;
+    const s=String(val).trim(); const m=s.match(/(\d{1,3})/);
+    return m?Math.min(150,parseInt(m[1],10)):null;
+  }
+  function normHeader(h){
+    return String(h||"")
+      .replace(/[\s\u00A0\u200B-\u200D\uFEFF]/g,'')
+      .toLowerCase();
+  }
+  function formatCell(v){
+    if(v===null||v===undefined) return "-";
+    const s=String(v).trim();
+    if(s===""||s==="0"||s==="0.0"||s==="0%"||/^nan/i.test(s)||/^nan%$/i.test(s)) return "-";
+    if(!isNaN(Number(s)) && Number(s)===0) return "-";
+    return s;
+  }
+  function pad2(n){ return String(n).padStart(2,'0'); }
+  function normalizeVisitDate(v){
+    if(v==null) return "";
+    let s = "";
+    if(typeof v === "number" && isFinite(v)){
+      s = String(Math.trunc(v));
+      if(v < 1000000) { 
+         const epoch = new Date(Date.UTC(1899,11,30));
+         const d = new Date(epoch.getTime() + Math.round(v)*24*60*60*1000);
+         return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth()+1)}-${pad2(d.getUTCDate())}`;
+      }
+    }else{
+      s = String(v).trim();
+      if(/[eE][+-]?\d+/.test(s)){
+        const n = Number(s);
+        if(isFinite(n)) s = String(Math.trunc(n));
+      }
+    }
+    const digits = (s.match(/\d+/g)||[]).join("");
+    if(digits.length >= 8 && (digits.startsWith('20') || digits.startsWith('19'))){
+      const y = digits.slice(0,4), mo = digits.slice(4,6), d = digits.slice(6,8);
+      const mi = parseInt(mo,10), di = parseInt(d,10);
+      if(mi>=1 && mi<=12 && di>=1 && di<=31) return `${y}-${mo}-${d}`;
+    }
+    if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    let m = s.match(/^(\d{4})[.\/-](\d{1,2})[.\/-](\d{1,2})/);
+    if(m) return `${m[1]}-${pad2(m[2])}-${pad2(m[3])}`;
+    return "";
+  }
+
+  /* ================= 표 렌더 ================= */
+  function renderSummaryTable(allRows){
+    const rows = allRows.filter(r=>r["연령대"]==="전체");
+    if(!rows.length){ document.getElementById('summaryOutput').innerHTML=""; return; }
+    const orderRooms=["1진료실","2진료실","3진료실","4진료실","5진료실","6진료실","7진료실","8진료실","9진료실","10진료실","전체"];
+    rows.sort((a,b)=>{
+      const ai=orderRooms.indexOf(a["구분"]); const bi=orderRooms.indexOf(b["구분"]);
+      return (ai===-1)-(bi===-1) || ai-bi || a["구분"].localeCompare(b["구분"]);
+    });
+    const cols=[
+      "구분","초진","초진주사","초진 주사처방률",
+      "초진 주사 평균 횟수","초진 주사 평균 내원 횟수",
+      "초진 주사 재진율",
+      "(18세▲)초진","(18세▲)초진주사","(18세▲)초진주사처방률",
+      "초진 평균 내원횟수","초진 재내원율",
+      "1회 내원 비율","2회 내원 비율","3회 내원 비율","4회 내원 비율",
+      "5회 내원 비율","6회 내원 비율","7회 내원 비율","8회 이상 내원 비율",
+      "특정 키워드 포함 메모 수"
+    ].filter(c=>c in rows[0]);
+    let thead='<tr>'+cols.map(h=>`<th>${h}</th>`).join('')+'</tr>';
+    let tbody=rows.map(r=>'<tr>'+cols.map(c=>`<td>${formatCell(r[c])}</td>`).join('')+'</tr>').join('');
+    document.getElementById('summaryOutput').innerHTML=`<table><thead>${thead}</thead><tbody>${tbody}</tbody></table>`;
+  }
+
+  function renderAgeTable(result){
+    result.sort((a,b)=>{
+      if(a["구분"]!==b["구분"]) return a["구분"].localeCompare(b["구분"]);
+      const ORDER=["0~10대","20대","30대","40대","50대","60대","70대이상","전체"];
+      return ORDER.indexOf(a["연령대"])-ORDER.indexOf(b["연령대"]);
+    });
+    if(!result.length){ document.getElementById('output').innerHTML=""; return; }
+
+    const desired=[
+      "초진","초진주사","초진 주사처방률",
+      "초진 주사 평균 횟수","초진 주사 평균 내원 횟수",
+      "초진 주사 재진율",
+      "(18세▲)초진","(18세▲)초진주사","(18세▲)초진주사처방률",
+      "1회 주사 비율","2회 주사 비율","3회 주사 비율","4회 주사 비율",
+      "5회 주사 비율","6회 주사 비율","7회 주사 비율","8회 이상 주사 비율",
+      "특정 키워드 포함 메모 수"
+    ];
+    const cols=desired.filter(col=>result.some(r=>col in r));
+    if(!cols.length){ document.getElementById('output').innerHTML=""; return; }
+
+    const groupRows={}; result.forEach(r=>{ groupRows[r["구분"]] = (groupRows[r["구분"]]||0)+1; });
+    let html='<table><thead><tr><th>진료실</th><th>연령대</th>';
+    html += cols.map(c=>`<th>${c}</th>`).join('')+'</tr></thead><tbody>';
+
+    let prev=null;
+    result.forEach(row=>{
+      html+='<tr>';
+      if(row["구분"]!==prev){
+        html+=`<td rowspan="${groupRows[row["구분"]]}">${row["구분"]}</td>`;
+        prev=row["구분"];
+      }
+      html+=`<td>${row["연령대"]}</td>`;
+      html+=cols.map(k=>`<td>${formatCell(row[k])}</td>`).join('');
+      html+='</tr>';
+    });
+    html+='</tbody></table>';
+    document.getElementById('output').innerHTML=html;
+  }
+
+  /* ================= 주사 1회자 추출 ================= */
+  function toSexAge(ageStr){
+    const t = String(ageStr||"").trim();
+    let m = t.match(/^([MF])\s*\/\s*(\d+)\s*세/i);
+    if(!m) m = t.match(/^([MF])\/(\d+)\s*세/i);
+    if(m){
+      const sex = (m[1].toUpperCase()==="M") ? "남" : "여";
+      return `${sex} ${m[2]}세`;
+    }
+    return t;
+  }
+
+  function extractInjOnceList(df, col){
+    if(!col || !col['차트'] || !col['마취']) return [];
+    const cnt = {}; const nameBy = {}; const sexAgeBy = {}; const roomBy = {};
+    const injDateBy = {}; const injMemoBy = {}; const firstDateBy = {};
+    const lastDateBy = {}; const lastMemoBy = {}; const visitDatesBy = {};
+
+    const nameCol = col['이름'] || col['수진자명'] || col['환자명'] || col['성명'] || null;
+    const memoCol = col['메모'] || null;
+    const ageCol  = col['연령'] || null;
+    const deptCol = col['과'] || null;
+    const dateCol = col['내원일'] || null;
+
+    const esc = (s)=>String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#39;");
+
+    df.forEach(r=>{
+      const id = (r[col['차트']] ?? '').toString().trim();
+      if(!id) return;
+      const inj = (r[col['마취']]||'').toString().includes('●');
+      if(inj) cnt[id] = (cnt[id]||0) + 1;
+
+      if(nameCol){
+        const nm = (r[nameCol]||'').toString().trim();
+        if(nm && !nameBy[id]) nameBy[id]=nm;
+      }
+      if(ageCol){
+        const a = (r[ageCol]||'').toString().trim();
+        if(a && !sexAgeBy[id]) sexAgeBy[id]=toSexAge(a);
+      }
+      if(deptCol){
+        const d = (r[deptCol]||'').toString().trim();
+        if(d && !roomBy[id]) roomBy[id]=d;
+      }
+      const dv = dateCol ? normalizeVisitDate(r[dateCol]) : "";
+      if(dv){
+        if(!firstDateBy[id] || dv < firstDateBy[id]) firstDateBy[id]=dv;
+        if(!lastDateBy[id] || dv > lastDateBy[id]) lastDateBy[id]=dv;
+        if(!visitDatesBy[id]) visitDatesBy[id] = new Set();
+        visitDatesBy[id].add(dv);
+        if(memoCol){
+          const mm = (r[memoCol]||'').toString().trim();
+          if(mm){
+            if(!lastMemoBy[id]) lastMemoBy[id]=mm;
+            if(dv === lastDateBy[id]) lastMemoBy[id]=mm;
+          }
+        }
+        if(inj){
+          injDateBy[id]=dv;
+          if(memoCol){
+            const mm = (r[memoCol]||'').toString().trim();
+            if(mm) injMemoBy[id]=mm;
+          }
+        }
+      }else{
+        if(inj && memoCol){
+          const mm = (r[memoCol]||'').toString().trim();
+          if(mm && !injMemoBy[id]) injMemoBy[id]=mm;
+        }
+      }
+    });
+
+    const out=[];
+    Object.keys(cnt).forEach(id=>{
+      if(cnt[id]===1){
+        const first = firstDateBy[id] || injDateBy[id] || "";
+        const last  = lastDateBy[id]  || injDateBy[id] || first || "";
+        const vcount = visitDatesBy[id] ? visitDatesBy[id].size : 0;
+        out.push({
+          "차트번호": id,
+          "수진자명": nameBy[id] || "",
+          "환자명": nameBy[id] || "",
+          "진료실": roomBy[id] || "",
+          "성별/나이": sexAgeBy[id] || "",
+          "최초 내원": normalizeVisitDate(first),
+          "주사 내원": injDateBy[id] ? normalizeVisitDate(injDateBy[id]) : "",
+          "최종 내원": normalizeVisitDate(last),
+          "내원 횟수": vcount ? String(vcount) : "",
+          "주사일 메모": injMemoBy[id] ? esc(injMemoBy[id]) : "",
+          "최종 내원 메모": lastMemoBy[id] ? esc(lastMemoBy[id]) : "",
+          "휴대폰": "" 
+        });
+      }
+    });
+    out.sort((a,b)=>String(a["차트번호"]).localeCompare(String(b["차트번호"])));
+    return out;
+  }
+
+  function extractNewpatientInjOnceList(df, col){
+    if(!col || !col['차트'] || !col['마취'] || !col['초재']) return [];
+    const firstSet = new Set(); 
+    df.forEach(r=>{
+      const t = (r[col['초재']] ?? '').toString().trim();
+      if(t==="신환" || t==="90일초진"){
+        const id = (r[col['차트']] ?? '').toString().trim();
+        if(id) firstSet.add(id);
+      }
+    });
+    const all = extractInjOnceList(df, col);
+    return all.filter(r=> firstSet.has(String(r["차트번호"]||"").trim()));
+  }
+
+  function showOneshotModal(list, modeLabel){
+    const modal=document.getElementById('oneshotModal');
+    const box=document.getElementById('oneshotTable');
+    const meta=document.getElementById('oneshotMeta');
+    const hasDateCol = !!(state && state.col && state.col['내원일']);
+
+    if(meta){
+      meta.textContent = `총 ${list.length}명 (${modeLabel||'전체'} · 주사 ● 1회)` + (hasDateCol ? '' : `  |  ⚠️ 내원일 컬럼을 못 찾았어요`);
+    }
+    const cols=["차트번호","환자명","휴대폰","최초 내원","주사 내원","최종 내원","내원 횟수","진료실","성별/나이","주사일 메모","최종 내원 메모"];
+
+    if(!list || !list.length){
+      box.innerHTML = '<p style="color:var(--muted);font-size:12px">해당 조건의 차트가 없습니다.</p>';
+    }else{
+      const normalized = (list||[]).map(r=>{
+        const row = Object.assign({}, r);
+        if((row["환자명"]==null || String(row["환자명"]).trim()==="")){
+          row["환자명"] = row["수진자명"] || "";
+        }
+        row["최초 내원"] = normalizeVisitDate(row["최초 내원"]); 
+        row["주사 내원"] = normalizeVisitDate(row["주사 내원"]); 
+        row["최종 내원"] = normalizeVisitDate(row["최종 내원"]);
+        try{ delete row["수진자명"]; }catch(e){}
+        return row;
+      }).sort((a,b)=>{
+        const da=String(a["최초 내원"]||"").trim();
+        const db=String(b["최초 내원"]||"").trim();
+        if(!da && !db) return 0;
+        if(!da) return 1;
+        if(!db) return -1;
+        return da.localeCompare(db);
+      });
+
+      const thead = '<tr>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr>';
+      const tbody = normalized.map(r=>'<tr>'+cols.map(c=>`<td>${formatCell(r[c])}</td>`).join('')+'</tr>').join('');
+      box.innerHTML = `<table><thead>${thead}</thead><tbody>${tbody}</tbody></table>`;
+    }
+    document.getElementById('modeAllBtn').classList.toggle('mode-active', state.oneshotMode==='all');
+    document.getElementById('modeNewBtn').classList.toggle('mode-active', state.oneshotMode==='new');
+    modal.style.display='block'; modal.scrollIntoView({behavior:'smooth', block:'start'});
+  }
+  function hideOneshotModal(){ document.getElementById('oneshotModal').style.display='none'; }
+
+  function downloadOneshotXLSX(list, mode){
+    if(!list || !list.length){ alert("다운로드할 데이터가 없습니다."); return; }
+    const cols=["차트번호","환자명","휴대폰","최초 내원","주사 내원","최종 내원","내원 횟수","진료실","성별/나이","주사일 메모","최종 내원 메모"];
+    const normalized = (list||[]).map(r=>{
+      const row={...r};
+      if((row["환자명"]==null || String(row["환자명"]).trim()==="") && row["수진자명"]){
+        row["환자명"]=row["수진자명"];
+      }
+      row["최초 내원"]=normalizeVisitDate(row["최초 내원"]); 
+      row["주사 내원"]=normalizeVisitDate(row["주사 내원"]); 
+      row["최종 내원"]=normalizeVisitDate(row["최종 내원"]); 
+      return row;
+    }).sort((a,b)=>{
+      const da=String(a["최초 내원"]||"").trim();
+      const db=String(b["최초 내원"]||"").trim();
+      if(!da && !db) return 0;
+      if(!da) return 1;
+      if(!db) return -1;
+      return da.localeCompare(db);
+    });
+    const aoa=[cols];
+    normalized.forEach(r=> aoa.push(cols.map(c=>r[c] ?? "")) );
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    XLSX.utils.book_append_sheet(wb, ws, mode==="new" ? "신환1회" : "전체1회");
+    XLSX.writeFile(wb, (mode==="new") ? "비트_신환_주사1회자_목록.xlsx" : "비트_주사1회자_목록.xlsx");
+  }
+
+  /* ================= 본 계산 ================= */
+  function parseData(data, keyword){
+    document.getElementById('warning').innerText='';
+    const headerIdx=findHeaderIndex(data);
+    if(headerIdx===-1){
+      document.getElementById('warning').innerText='❗ 유효한 헤더를 찾을 수 없습니다.';
+      state.df=null; state.col=null; state.oneshotRows=[];
+      document.getElementById('oneshotBtn').disabled=true;
+      document.getElementById('oneshotDlBtn').disabled=true;
+      return;
+    }
+    const headers=data[headerIdx].map(h=>String(h).trim());
+    const body=data.slice(headerIdx+1).filter(r=>r.length>1);
+    const df=body.map(row=>Object.fromEntries(headers.map((h,i)=>[h, row[i] ?? ""])));
+    const col={};
+    headers.forEach(h=>{
+      const l = normHeader(h);
+      if(l.includes("초") && l.includes("재")) col['초재']=h;
+      if(l.includes("차트") || l.includes("챠트") || l.includes("차트번호") || l.includes("챠트번호") || l==="id" || l.includes("등록")) col['차트']=h;
+      if((l.includes("진료") && l.includes("과")) || l==="진료과" || l.includes("과목")) col['과']=h;
+      if(l.includes("진료실") || (l.includes("진료") && l.includes("실"))) col['진료실']=h;
+      if(l.includes("수진자") || l.includes("환자명") || l.includes("성명") || (l.includes("이름") && !l.includes("파일"))) col['이름']=h;
+      if(l.includes("휴대") || l.includes("핸드폰") || (l.includes("전화") && !l.includes("파일")) || l.includes("연락")) col['전화']=h;
+      if(l.includes("연령") || l.includes("나이") || l.includes("s/a")) col['연령']=h;
+      if(l.includes("메모") || l.includes("비고") || l.includes("특이")) col['메모']=h;
+      if(l.includes("마취")) col['마취']=h;
+      if(l==="내원일" || l==="내원일자" || l==="내원날짜" || l.includes("내원일") || l.includes("내원일자") || l.includes("내원날짜") || l.includes("방문일") || l.includes("진료일") || l.includes("접수일")) col['내원일']=h;
+    });
+
+    const result=[];
+    function makeStat(rows, label, ageGroup="전체"){
+      const 초진 = rows.filter(r=>["신환","90일초진"].includes(r[col['초재']]));
+      const 초진차트=[...new Set(초진.map(r=>r[col['차트']]))];
+      const 주사 = 초진.filter(r=>(r[col['마취']]||'').includes('●'));
+      const 주사차트=[...new Set(주사.map(r=>r[col['차트']]))];
+      const 주사기록 = rows.filter(r=>주사차트.includes(r[col['차트']]));
+
+      const 주사횟수={}, 내원횟수={};
+      주사기록.forEach(r=>{
+        const id=r[col['차트']];
+        if((r[col['마취']]||'').includes('●')) 주사횟수[id]=(주사횟수[id]||0)+1;
+        내원횟수[id]=(내원횟수[id]||0)+1;
+      });
+      const 평균주사 = Object.keys(주사횟수).length ? (Object.values(주사횟수).reduce((a,b)=>a+b,0)/Object.keys(주사횟수).length).toFixed(1) : 0;
+      const 평균내원 = Object.keys(내원횟수).length ? (Object.values(내원횟수).reduce((a,b)=>a+b,0)/Object.keys(내원횟수).length).toFixed(1) : 0;
+      const injRevisitRate = Object.keys(내원횟수).length ? Math.round((Object.values(내원횟수).filter(v=>v>=2).length/Object.keys(내원횟수).length)*100)+'%' : '-';
+
+      const 초진기록 = rows.filter(r=>초진차트.includes(r[col['차트']]));
+      const 초진내원={};
+      초진기록.forEach(r=>{ const id=r[col['차트']]; 초진내원[id]=(초진내원[id]||0)+1; });
+      const 평균초진내원 = Object.keys(초진내원).length ? (Object.values(초진내원).reduce((a,b)=>a+b,0)/Object.keys(초진내원).length).toFixed(1) : 0;
+      const 재내원수 = Object.values(초진내원).filter(v=>v>=2).length;
+      const visitRatio = (n,op="eq")=>{
+        const denom=Object.keys(초진내원).length; if(!denom) return 0;
+        const arr=Object.values(초진내원);
+        const num=op==="ge" ? arr.filter(v=>v>=n).length : arr.filter(v=>v===n).length;
+        return Math.round((num/denom)*100);
+      };
+      const injRatio = (n,op="eq")=>{
+        const denom=Object.keys(주사횟수).length; if(!denom) return 0;
+        const arr=Object.values(주사횟수);
+        const num=op==="ge" ? arr.filter(v=>v>=n).length : arr.filter(v=>v===n).length;
+        return Math.round((num/denom)*100);
+      };
+      const 키워드수 = col['메모'] && keyword ? rows.filter(r=>(r[col['메모']]||'').toLowerCase().includes(keyword)).length : "";
+      
+      let adultRows=[];
+      if(col['연령']){
+        adultRows = rows.filter(r=>{
+          const a=parseAge(r[col['연령']]);
+          return a!==null && a>=18;
+        });
+      }
+      const adultFirst = adultRows.filter(r=>["신환","90일초진"].includes(r[col['초재']]));
+      const adultFirstCharts=[...new Set(adultFirst.map(r=>r[col['차트']]))];
+      const adultInj = adultFirst.filter(r=>(r[col['마취']]||'').includes('●'));
+      const adultRate = adultFirstCharts.length ? Math.round((adultInj.length/adultFirstCharts.length)*100)+'%' : '-';
+
+      result.push({
+        "구분": label, "연령대": ageGroup, "초진": 초진차트.length, "초진주사": 주사.length, "초진 주사 재진율": injRevisitRate,
+        "초진 주사 평균 횟수": 평균주사, "초진 주사 평균 내원 횟수": 평균내원, "초진 주사처방률": `${초진차트.length ? Math.round((주사.length/초진차트.length)*100) : 0}%`,
+        "(18세▲)초진": adultFirstCharts.length, "(18세▲)초진주사": adultInj.length, "(18세▲)초진주사처방률": adultRate,
+        "초진 평균 내원횟수": 평균초진내원, "초진 재내원율": `${초진차트.length ? Math.round((재내원수/초진차트.length)*100) : 0}%`,
+        "1회 내원 비율": `${visitRatio(1)}%`, "2회 내원 비율": `${visitRatio(2)}%`, "3회 내원 비율": `${visitRatio(3)}%`, "4회 내원 비율": `${visitRatio(4)}%`,
+        "5회 내원 비율": `${visitRatio(5)}%`, "6회 내원 비율": `${visitRatio(6)}%`, "7회 내원 비율": `${visitRatio(7)}%`, "8회 이상 내원 비율": `${visitRatio(8,"ge")}%`,
+        "1회 주사 비율": `${injRatio(1)}%`, "2회 주사 비율": `${injRatio(2)}%`, "3회 주사 비율": `${injRatio(3)}%`, "4회 주사 비율": `${injRatio(4)}%`,
+        "5회 주사 비율": `${injRatio(5)}%`, "6회 주사 비율": `${injRatio(6)}%`, "7회 주사 비율": `${injRatio(7)}%`, "8회 이상 주사 비율": `${injRatio(8,"ge")}%`,
+        "특정 키워드 포함 메모 수": 키워드수
+      });
+    }
+
+    if(!col['초재'] || !col['차트'] || !col['과'] || !col['마취']){
+      document.getElementById('warning').innerText='❗ 필요한 컬럼(초/재, 차트번호, 진료실/과목, 마취)을 찾지 못했습니다.';
+      return;
+    }
+
+    const 전체=df;
+    if(col['연령']){ AGE_ORDER.slice(0,-1).forEach(a=>makeStat(전체.filter(r=>getAgeGroup(r[col['연령']])===a), "전체", a)); }
+    makeStat(전체, "전체", "전체");
+
+    const 진료과들 = [...new Set(df.map(r=>(r[col['과']] ?? '').toString().trim()).filter(Boolean))];
+    진료과들.forEach(과=>{
+      const rows=df.filter(r=>(r[col['과']] ?? '').toString().trim()===과);
+      if(col['연령']){ AGE_ORDER.slice(0,-1).forEach(a=>makeStat(rows.filter(r=>getAgeGroup(r[col['연령']])===a), 과, a)); }
+      makeStat(rows, 과, "전체");
+    });
+
+    renderSummaryTable(result);
+    renderAgeTable(result);
+
+    const ones = extractInjOnceList(df, col);
+    const onesNew = extractNewpatientInjOnceList(df, col);
+    state.df=df; state.col=col; state.oneshotRows=ones; state.oneshotNewRows=onesNew; state.oneshotMode='all';
+    document.getElementById('oneshotBtn').disabled = false;
+    document.getElementById('oneshotDlBtn').disabled = false;
+    state.oneshotMode='all';
+    showOneshotModal(withPhone(state.oneshotRows || []), '전체');
+  }
+
+  document.getElementById('fileInput').addEventListener('change', async function(e){
+    const file=e.target.files[0];
+    const keyword=(document.getElementById('keywordInput')?.value || '').trim().toLowerCase();
+    if(!file) return;
+    try{
+      let rawData=[];
+      const isCSV=/\.csv$/i.test(file.name);
+      if(isCSV){
+        const text=await file.text();
+        rawData = smartCSVtoRows(text);
+      }else{
+        const buf=await file.arrayBuffer();
+        const wb=XLSX.read(buf,{type:'array'});
+        wb.SheetNames.forEach(sheet=>{
+          const rows=XLSX.utils.sheet_to_json(wb.Sheets[sheet],{header:1,defval:""});
+          rawData = rawData.concat(rows);
+        });
+      }
+      parseData(rawData, keyword);
+    }catch(err){ console.error(err); document.getElementById('warning').innerText='❗ 파일을 읽는 중 문제가 발생했습니다.'; }
+  });
+
+  document.getElementById('routeFileInput').addEventListener('change', async function(e){
+    const file=e.target.files[0];
+    const btn=document.getElementById('routeStatusBtn');
+    if(!file){ state.routeMap=null; btn.textContent='내원경로: 미업로드'; btn.disabled=true; return; }
+    try{
+      btn.textContent='내원경로: 읽는 중...'; btn.disabled=true;
+      const map = await loadRouteFileToMap(file);
+      state.routeMap = map;
+      btn.textContent = `내원경로: ${map.size}명 로드됨`; btn.disabled=false;
+      const modal=document.getElementById('oneshotModal');
+      if(modal && modal.style.display!=='none'){
+        const cur = (state.oneshotMode==='new') ? (state.oneshotNewRows||[]) : (state.oneshotRows||[]);
+        const label = (state.oneshotMode==='new') ? '신환(90일초진 포함)' : '전체';
+        showOneshotModal(withPhone(cur), label);
+      }
+    }catch(err){
+      console.error(err); state.routeMap=null; btn.textContent='내원경로: 업로드 실패'; btn.disabled=true;
+      document.getElementById('warning').innerText='❗ 내원경로 파일을 읽는 중 문제가 발생했습니다.';
+    }
+  });
+
+  document.getElementById('oneshotBtn').addEventListener('click', ()=>{
+    state.oneshotMode='all'; showOneshotModal(withPhone(state.oneshotRows || []), '전체');
+  });
+  document.getElementById('oneshotDlBtn').addEventListener('click', ()=>{
+    downloadOneshotXLSX(withPhone(state.oneshotMode==='new' ? (state.oneshotNewRows||[]) : (state.oneshotRows||[])), state.oneshotMode);
+  });
+  document.getElementById('modalDlBtn').addEventListener('click', ()=>{
+    downloadOneshotXLSX(withPhone(state.oneshotMode==='new' ? (state.oneshotNewRows||[]) : (state.oneshotRows||[])), state.oneshotMode);
+  });
+  document.getElementById('modeAllBtn').addEventListener('click', ()=>{
+    state.oneshotMode='all'; showOneshotModal(withPhone(state.oneshotRows || []), '전체');
+  });
+  document.getElementById('modeNewBtn').addEventListener('click', ()=>{
+    state.oneshotMode='new'; showOneshotModal(withPhone(state.oneshotNewRows || []), '신환(90일초진 포함)');
+  });
+  document.getElementById('modalCloseBtn').addEventListener('click', hideOneshotModal);
+</script>
+</body>
+</html>

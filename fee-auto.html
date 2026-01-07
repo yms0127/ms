@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>JINSUL - Case Verification System (Set Search)</title>
+    <style>
+        /* [UI 스타일 유지] */
+        :root { --primary: #333; --accent: #d73a49; --blue: #0052cc; --bg: #f6f6f7; --border: #ccc; }
+        body { margin: 0; background-color: var(--bg); color: var(--primary); font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; overflow-x: hidden; }
+        input, select, button { font-family: inherit; } 
+        .wm { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 0; }
+        .wm img { width: min(760px, 78vw); opacity: .20; filter: grayscale(1) saturate(0) brightness(.65) contrast(1.05); }
+        header { width: 100%; padding: 25px 0; text-align: center; position: relative; z-index: 1; }
+        .top-logo { width: 170px; filter: grayscale(1) brightness(.45) contrast(1.15); opacity: 0.8; }
+        #syncBoard { position: absolute; top: 10px; right: 20px; background: rgba(255,255,255,0.8); border: 1px solid #222; border-radius: 8px; padding: 12px 18px; font-size: 12px; z-index: 1000; box-shadow: 0 4px 15px rgba(0,0,0,0.05); width: 240px; backdrop-filter: blur(5px); }
+        #setBoard { position: absolute; top: 10px; left: 20px; background: rgba(255,255,255,0.8); border: 1px solid #222; border-radius: 8px; padding: 12px 18px; font-size: 12px; z-index: 1000; box-shadow: 0 4px 15px rgba(0,0,0,0.05); width: 210px; backdrop-filter: blur(5px); }
+        #setBoard select { width: 100%; margin-top: 6px; padding: 6px 8px; border-radius: 10px; border: 1px solid #ddd; font-weight: 700; font-size: 12px; background: rgba(255,255,255,0.9); }
+        .sync-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .sync-row:last-child { margin-bottom: 0; }
+        .sync-label { color: #555; font-weight: 700; }
+        .sync-val { font-weight: 800; color: #333; }
+        .ver-tag { font-size: 10px; color: #999; margin-left: 5px; font-weight: normal; }
+        .container { width: 1550px; max-width: 98%; margin: 0 auto; display: grid; grid-template-columns: 1.75fr 1.25fr; gap: 25px; padding-bottom: 80px; position: relative; z-index: 1; flex: 1; }
+        .card { background: rgba(255, 255, 255, 0.2); border: 1px solid rgba(0,0,0,0.08); border-radius: 12px; padding: 25px; backdrop-filter: blur(2px); margin-bottom: 20px; box-shadow: 0 5px 20px rgba(0,0,0,0.02); }
+        .section-title { font-size: 0.95em; font-weight: 800; color: #555; margin: 0 0 12px 0; border-left: 4px solid var(--primary); padding-left: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .switch { position: relative; display: inline-block; width: 34px; height: 20px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 20px; }
+        .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--blue); }
+        input:checked + .slider:before { transform: translateX(14px); }
+        .consult-group { display: flex; gap: 8px; margin-bottom: 20px; }
+        .c-btn { flex: 1; padding: 12px; border: 1px solid rgba(0,0,0,0.2); border-radius: 8px; background: rgba(255,255,255,0.4); cursor: pointer; font-weight: 800; font-size: 13px; color: #444; transition: 0.2s; }
+        .c-btn:hover { background: rgba(255,255,255,0.6); }
+        .c-btn.active { border-color: var(--primary); background: var(--primary); color: #fff; }
+        
+        /* 레이아웃 고정 */
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; }
+        th { padding: 8px 10px; text-align: left; font-size: 0.8em; color: #666; border-bottom: 2px solid rgba(0,0,0,0.1); background: transparent !important; white-space: nowrap; }
+        td { padding: 6px 10px; background: transparent !important; font-size: 0.95em; font-weight: 600; border-bottom: 1px solid rgba(0,0,0,0.05); vertical-align: middle; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        th:nth-child(1) { width: 95px; } 
+        th:nth-child(2) { width: auto; } 
+        th:nth-child(3) { width: 80px; text-align:right; }
+        th:nth-child(4) { width: 55px; text-align:center; }
+        th:nth-child(5) { width: 60px; text-align:center; }
+        th:nth-child(6) { width: 40px; text-align:center; }
+        th:nth-child(7) { width: 40px; text-align:center; }
+        
+        .input-wrapper { position: relative; border: 1px solid rgba(0,0,0,0.2); border-radius: 4px; padding: 0 24px 0 8px; background: rgba(255,255,255,0.3); display: flex; align-items: center; height: 32px; transition: 0.2s; }
+        .input-wrapper:focus-within { border-color: var(--blue); background: rgba(255,255,255,0.8); box-shadow: 0 0 0 2px rgba(0, 82, 204, 0.1); }
+        .input-wrapper::after { content: '✎'; position: absolute; right: 6px; top: 50%; transform: translateY(-50%); font-size: 12px; color: #999; pointer-events: none; }
+        .box-input { border: none; background: transparent !important; width: 100%; font-weight: 800; font-family: inherit; outline: none; font-size: 13px; color: #333; height: 100%; }
+        .box-input-num { border: 1px solid rgba(0,0,0,0.25); border-radius: 4px; background: transparent !important; padding: 0 4px; height: 32px; font-weight: 800; outline: none; font-size: 13px; width: 100%; transition: 0.2s; color: #333; text-align: center; }
+        .box-input-num:focus { border-color: var(--blue); background: rgba(255,255,255,0.2) !important; }
+        .type-btn { border: 1px solid transparent; border-radius: 6px; padding: 0 10px; height: 28px; font-size: 11px; font-weight: 800; cursor: pointer; transition: 0.2s; width: 100%; text-align: center; }
+        .type-btn:hover { transform: translateY(-1px); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .type-b { background: #e3f2fd; color: #0052cc; border-color: #bbdefb; }
+        .type-nb { background: #ffeef0; color: #d73a49; border-color: #ffcdd2; }
+        .badge { display: inline-block; padding: 2px 6px; font-size: 10px; border-radius: 4px; font-weight: 900; margin-left: 6px; white-space: nowrap; letter-spacing: -0.5px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .badge-req { background: #fff3e0; color: #ef6c00; border: 1px solid #ffe0b2; }
+        .badge-con { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
+        .p-input { width: 100%; text-align: right; color: #333; }
+        .q-input { width: 100%; text-align: center; color: var(--accent); }
+        .diag-table { width: 100%; margin-bottom: 25px; }
+        .diag-table td { padding: 8px 10px; background: transparent !important; border-bottom: 1px dashed rgba(0,0,0,0.1); color: #444; }
+        .diag-code { font-weight: 800; color: var(--blue); }
+        .set-selector-group { display: flex; gap: 10px; position: relative; }
+        #setSel { flex: 1; background: rgba(255,255,255,0.3); border: 2px solid rgba(0,0,0,0.2); border-radius: 8px; padding: 12px; outline: none; cursor: pointer; font-weight: 800; font-size: 1.1em;  min-width:0;}
+        #setSearchInput { width: 140px; border: 2px solid rgba(0,0,0,0.2); border-radius: 8px; padding: 0 12px; background: rgba(255,255,255,0.5); font-weight: 800; outline: none; font-size: 13px; }
+        #setSearchInput:focus { border-color: var(--blue); background: #fff; }
+        .summary-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px dashed rgba(0,0,0,0.1); }
+        .summary-label { font-size: 13px; font-weight: 700; color: #666; }
+        .summary-val { font-size: 16px; font-weight: 900; color: #333; }
+        .target-input { font-size: 2.2em; width: 180px; background: none; border: none; border-bottom: 3px solid var(--primary); color: var(--primary); text-align: right; font-weight: 900; outline: none; }
+        #finalPay { font-size: 3.2em; font-weight: 900; color: var(--accent); letter-spacing: -2px; line-height: 1; }
+        .matrix-container { display: grid; grid-template-columns: repeat(1, 1fr); gap: 6px; margin-top: 15px; }
+        .matrix-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: rgba(255,255,255,0.4); border: 1px solid rgba(0,0,0,0.1); border-radius: 8px; font-size: 12px; cursor: pointer; transition: 0.2s; }
+        .matrix-row:hover { background: rgba(240, 247, 255, 0.6); border-color: var(--blue); transform: translateY(-1px); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .matrix-target { font-weight: 800; color: #555; }
+        .matrix-val { font-weight: 900; color: var(--blue); font-size: 13px; }
+        .carry-btn { background: none; border: none; font-size: 1.1em; cursor: pointer; opacity: 0.3; transition: 0.2s; }
+        .carry-btn.active { opacity: 1; color: var(--blue); }
+        .del-btn { background: none; border: none; font-size: 1.1em; cursor: pointer; opacity: 1; color: #999; transition: 0.2s; } 
+        .del-btn:hover { color: #d73a49; transform: scale(1.15); }
+        .search-dropdown { position: absolute; background: rgba(255,255,255,0.98); z-index: 9999; border-radius: 8px; box-shadow: 0 5px 20px rgba(0,0,0,0.15); display: none; max-height: 300px; overflow-y: auto; border: 1px solid #ddd; width: 300px; }
+        .search-item { padding: 10px 12px; border-bottom: 1px solid #eee; cursor: pointer; display: flex; justify-content: space-between; font-size: 12px; }
+        .search-item:hover { background: #f5f5f5; }
+        .alert-box { padding: 12px 15px; border-radius: 8px; font-weight: 800; font-size: 13px; margin-bottom: 15px; display: none; border: 1px solid transparent; }
+        .alert-red { background: rgba(255, 240, 241, 0.7); color: #d73a49; border-color: #d73a49; }
+        .alert-orange { background: rgba(255, 248, 230, 0.7); color: #b7791f; border-color: #b7791f; }
+        footer { width: 100%; text-align: center; padding: 50px 0; font-size: 12px; color: #888; background: transparent; font-weight: 600; }
+        .inj-only-toggle{display:flex;align-items:center;gap:6px;padding:6px 10px;border:2px solid rgba(0,0,0,0.15);border-radius:10px;background:rgba(255,255,255,0.35);cursor:pointer;font-weight:900;font-size:12px;user-select:none;white-space:nowrap;min-width:74px;}
+        .inj-only-toggle input{accent-color: var(--blue); width:14px; height:14px;}
+        .select-line select, .select-line input {min-width:0;}
+        .inj-only-toggle{flex:0 0 auto;}
+        .block-adjust-row{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 12px; background:rgba(255,255,255,0.2); border:1px solid rgba(0,0,0,0.12); border-radius:8px; margin-top:8px;}
+        .block-adjust-label{font-size:12px; font-weight:900; color:#444; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+        .block-adjust-ctrl{display:flex; align-items:center; gap:8px; flex-shrink: 0;}
+        .block-btn{width:34px; height:30px; border-radius:8px; border:2px solid rgba(0,0,0,0.18); background:rgba(255,255,255,0.5); font-weight:900; cursor:pointer; font-size:14px; line-height:1;}
+        .block-btn:hover{border-color: var(--blue); box-shadow:0 2px 5px rgba(0,0,0,0.06); transform: translateY(-1px);}
+        .block-step{width:70px; padding:6px 8px; border-radius:8px; border:2px solid rgba(0,0,0,0.18); background:rgba(255,255,255,0.55); font-weight:900; text-align:center;}
+    </style>
+</head>
+<body onclick="closeSearch(event)">
+<div class="wm"><img src="https://raw.githubusercontent.com/jinsul-lab/openteam/main/jinsul-logo.png"></div>
+<div id="setBoard">
+    <div class="sync-row"><span class="sync-label">처방세트</span><span id="setFileStatus" class="sync-val">-</span><span class="ver-tag">v0.0.0.7</span></div>
+    <select id="setFileSel" onchange="changeSetFile()"><option value="">로딩중...</option></select>
+</div>
+<div id="syncBoard">
+    <div class="sync-row"><span class="sync-label">수가 적용일자</span><span id="st-date" class="sync-val">-</span></div>
+    <div class="sync-row"><span class="sync-label">데이터 누적수</span><span id="st-db" class="sync-val">...</span></div>
+</div>
+<header><img src="https://raw.githubusercontent.com/jinsul-lab/openteam/main/jinsul-logo.png" class="top-logo"></header>
+<div class="container">
+    <div class="main-column">
+        <div class="card">
+            <div class="section-title">진찰료 산정</div>
+            <div class="consult-group">
+                <button onclick="setConsult('first')" id="btn-first" class="c-btn">초진</button>
+                <button onclick="setConsult('follow')" id="btn-follow" class="c-btn">재진</button>
+                <button onclick="setConsult('none')" id="btn-none" class="c-btn active">산정 안함</button>
+            </div>
+            <div class="section-title">코드 선택</div>
+            <div class="set-selector-group">
+                <select id="setSel" onchange="changeSet()"></select>
+                <input type="text" id="setSearchInput" placeholder="🔍 세트 검색" oninput="searchSets(this.value, this)" onkeydown="if(event.key==='Escape') clearSearch()">
+                <label class="inj-only-toggle" title="차단술/수팽/관절조영 등 주사 세트만 표시"><input type="checkbox" id="injOnlyToggle" onchange="toggleInjectionOnly()"> 주사만</label>
+            </div>
+            <div id="dataView" style="display:none; margin-top:30px;">
+                <div class="section-title"><span>환자 증상 (C.C)</span><label class="switch"><input type="checkbox" id="ccSwitch" checked onchange="toggleCC()"><span class="slider"></span></label></div>
+                <div id="ccContent" style="padding:15px; background:rgba(0,0,0,0.05); border-radius:8px; font-size:0.95em; line-height:1.6; margin-bottom:30px; border-left: 0px solid #999; min-height:20px; font-weight: 600;"></div>
+                <div id="diagSection" style="display:none;"><div class="section-title" style="border-left-color: var(--blue); color:var(--blue); cursor: default;">상병 내역</div><table class="diag-table"><thead><tr><th style="width:20%">상병코드</th><th>상병명칭</th></tr></thead><tbody id="diagList"></tbody></table></div>
+                <div class="section-title" style="cursor: default;">처방 내역 / 비급여 조정</div>
+                <div id="mainAlertBox" class="alert-box"></div>
+                <table><thead><tr><th>처방코드</th><th>처방명칭</th><th>단가</th><th>수량</th><th>구분</th><th>유지</th><th>삭제</th></tr></thead><tbody id="itemList"></tbody></table>
+                <div style="margin-top:20px; display:flex; gap:10px; position:relative;" id="searchBox">
+                    <input type="text" id="searchInput" placeholder="명칭 또는 코드로 처방 검색" style="flex:1; padding:12px; border-radius:8px; border:2px solid rgba(0,0,0,0.2); font-weight:800; outline:none; font-size: 13px; background: rgba(255,255,255,0.3);" oninput="searchLive(this.value, 'main', this)" onkeydown="if(event.key==='Escape') clearSearch()">
+                    <button onclick="addManualItem()" style="padding:0 20px; background:rgba(255,255,255,0.5); border:2px solid var(--primary); border-radius:8px; font-weight:800; cursor:pointer; font-size:12px;">+ 임의 추가</button>
+                </div>
+                <button onclick="autoBalance()" style="background:var(--primary); color:white; width:100%; padding:18px; border:none; border-radius:10px; font-weight:900; margin-top:30px; cursor:pointer; font-size:1.05em; letter-spacing: 1px;">계산</button>
+            </div>
+        </div>
+    </div>
+    <div class="side-column">
+        <div class="card" style="background: rgba(255, 255, 255, 0.1); text-align: center; padding: 30px 20px;"><div style="font-size: 0.85em; color: #666; margin-bottom: 10px; font-weight: 800; letter-spacing: 1px;">목표가</div><div><input type="number" id="tAmt" class="target-input" value="89000" oninput="autoBalance()"> <span style="font-size: 1.2em; font-weight: 900;">원</span></div></div>
+        <div class="card" style="border-top: 6px solid var(--primary);">
+            <div class="summary-row"><span class="summary-label">총 진료비 합계</span><span id="totalFull" class="summary-val">0</span></div>
+            <div class="summary-row"><span class="summary-label">급여 (본인부담 30%)</span><span id="summaryBenefit" class="summary-val">0</span></div>
+            <div class="summary-row" style="border-bottom:none;"><span class="summary-label">비급여 (100% 전액)</span><span id="summaryNonBenefit" class="summary-val" style="color:var(--blue);">0</span></div>
+            <div style="text-align: center; margin-top: 25px; padding-top: 20px; border-top: 2px solid rgba(0,0,0,0.1);"><div style="font-size: 12px; color: #777; font-weight: 800; margin-bottom: 8px;">최종 실제 수납액</div><div id="finalPay">0</div></div>
+            <div id="blockAdjustWrap" style="margin-top:25px; text-align:left; border-top: 1px dashed rgba(0,0,0,0.1); padding-top: 20px;"></div>
+            <div class="section-title" style="margin-top:40px; border-left-color: var(--blue);">금액별 수량 조정</div>
+            <div id="matrixAdjustName" style="font-size:11px; color:var(--blue); font-weight:800; margin-bottom:10px; text-align:right;">-</div>
+            <div id="matrixTable" class="matrix-container"></div>
+        </div>
+    </div>
+</div>
+<div id="globalSearchLayer" class="search-dropdown"></div>
+<footer>© JINSUL · 경험과 가치를 현실화하는 컨설팅</footer>
+<script>
+    const LOCAL_DATA = {}; 
+    let DB = LOCAL_DATA;
+    let flatDB = [];
+    let carryOverItems = new Map();
+    let currentCustomItems = []; 
+    let deletedSetItems = new Set();
+    const STRATEGY_DRUGS = ["비엠히루니다제", "말린다주", "리포라제주"];
+    const CONTRAST_REQUIRED_CODES = ["LA354", "LA359", "LA253", "LA355", "LA352", "HA280", "MM410"];
+    const CONTRAST_KEYWORDS = ["OMNI", "VISI", "IOP", "HEX", "BONO", "CONTRAST", "옴니", "울트라", "가도", "파미", "비지", "이오", "헥사", "보노", "도타", "게네", "센스", "파큐", "유니", "마그네", "클라리"];
+    let CONSULT_PRICES = { first: 0, follow: 0 };
+    let currentConsult = "none";
+    let activeInputEl = null;
+    const fmt = n => Math.floor(n || 0).toLocaleString();
+    const clean = n => parseFloat(String(n).replace(/,/g, '')) || 0;
+
+    // [복구] GitHub API 원복 (사용자 파일 기반)
+    const GITHUB_OWNER = "jinsul-lab";
+    const GITHUB_REPO = "openteam";
+    const GITHUB_BRANCH = "main";
+    const RAW_BASE = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/${GITHUB_BRANCH}/`;
+    const API_BASE = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/`;
+    const unwrapData = (obj) => (obj && typeof obj === 'object' && obj.data && typeof obj.data === 'object') ? obj.data : obj;
+    async function fetchJsonFromGithub(fileName) { const res = await fetch(RAW_BASE + fileName + "?t=" + Date.now()); if (!res.ok) throw new Error("fetch 실패: " + fileName); return await res.json(); }
+    async function listSetFiles() { try { const res = await fetch(API_BASE + "?ref=" + GITHUB_BRANCH); if (!res.ok) throw new Error("list 실패"); const items = await res.json(); return (Array.isArray(items) ? items : []).filter(it => it && it.type === "file" && /^set.*\.json$/i.test(it.name)).map(it => it.name).sort((a,b) => a.localeCompare(b)); } catch(e) { console.warn("set*.json 목록 조회 실패:", e); return []; } }
+
+    let INJ_ONLY = false;
+    let SET_META = {};   
+    const PART_ORDER = ["경추","흉추","요추","어깨","팔꿈치","손목/손","골반/고관절","대퇴/무릎","발목/발","기타"];
+    function setFileDisplayName(f){ f=(f||"").toString(); if(f.toLowerCase()==="set_databaset.json"||f.toLowerCase()==="신경차단술 조합.json")return "신경차단술 조합"; const m=f.toLowerCase().match(/^set_([^\/]+)\.json$/i); if(m)return `${m[1]} 묶음코드`; return f; }
+    function normalizeCodeForLookup(c){ c=(c||"").toString().trim().toUpperCase(); if(!c)return ""; const m=c.match(/^([A-Z]{1,3}\d{2,6})[A-Z_]+$/); return m?m[1]:c; }
+    function fmt1(n){ const x=parseFloat(n); return isNaN(x)?"0.0":x.toFixed(1); }
+    function detectMainTag(s){ const i=(s&&s.it)?s.it:[]; const a=i.map(x=>(x&&x.n?String(x.n):"")).join(" "); const c=i.map(x=>(x&&x.c?String(x.c):"")).join(" ").toUpperCase(); if(/수압팽창술|수압\s*팽창|hydrodilat/i.test(a))return "수팽"; if(/\bHA280\b/.test(c)||/HA280/i.test(c))return "조영"; return ""; }
+    function sumBlockQty(s,p){ const i=(s&&s.it)?s.it:[]; let m=0; i.forEach(x=>{ const n=(x&&x.n!=null)?String(x.n):""; const c=(x&&x.c!=null)?String(x.c).toUpperCase():""; if(p.some(r=>(r instanceof RegExp)?(r.test(n)||r.test(c)):(n.includes(r)||c.includes(String(r).toUpperCase())))) m+=(parseFloat(x.q)||0); }); return m; }
+    function inferSpineRegion(s){ const c=(s&&s.cc)?s.cc.join(" "):""; const n=((s&&s.it)?s.it.map(x=>String(x.n||"")).join(" "):""); let t=(c+" "+n).toUpperCase(); t=t.replace(/K\s*-\s*L\s*\d\s*(?:~|\-|TO)?\s*\d?/gi," ").replace(/K\s*-\s*L/gi," "); if(/\bC[\-\s]?\d/.test(t)||/CERV/i.test(t)||/경추|목/.test(t))return "C"; if(/\bT[\-\s]?\d/.test(t)||/THOR/i.test(t)||/흉추|흉/.test(t))return "T"; if(/\bL[\-\s]?\d/.test(t)||/LUMB/i.test(t)||/요추|허리/.test(t))return "L"; if(/(EPI\b|EPIDURO)/i.test(t)&&/CERV/i.test(t))return "C"; if(/(EPI\b|EPIDURO)/i.test(t)&&/THOR/i.test(t))return "T"; if(/(EPI\b|EPIDURO)/i.test(t)&&/LUMB/i.test(t))return "L"; return ""; }
+    function inferPeripheralPart(s){ const c=(s&&s.cc)?s.cc.join(" "):""; const n=((s&&s.it)?s.it.map(x=>String(x.n||"")).join(" "):""); const t=c+" "+n; if(/SCPB|\bCPB\b|SFCP|경신경총|CERVICAL\s*PLEX/i.test(t))return "경추"; if(/어깨|견관절|회전근|견봉|견갑|SSNB|견갑신경|액와신경|\bANB\b/i.test(t))return "어깨"; if(/팔꿈치|주관절|elbow/i.test(t))return "팔꿈치"; if(/손목|수근|손가락|손\s*저림|hand|wrist|\bAPNB\b|DIGITAL|MEDIAN|ULNAR|RADIAL/i.test(t))return "손목/손"; if(/고관절|hip|천장관절|\bSIJ\b|골반/i.test(t))return "골반/고관절"; if(/무릎|슬관절|knee|대퇴|허벅지|\bFNB\b|대퇴신경|\bLFCNB\b|외측대퇴피|\bSCNB\b|좌골신경/i.test(t))return "대퇴/무릎"; if(/발목|족관절|ankle|발\b|foot|하퇴|종아리|\bSNB\b|SUR/i.test(t))return "발목/발"; return "기타"; }
+    function isInjectionSet(s){ const i=(s&&s.it)?s.it:[]; const a=i.map(x=>String(x.n||"")+" "+String(x.c||"")).join(" ").toUpperCase(); return /차단|BLOCK|MBB|SNRB|PDNB|FJB|EPI|EPIDUR|SSNB|FNB|LFCNB|PCB|SCNB|액와|관절조영|HA280|수압팽창|HYDRODILAT/.test(a); }
+    function buildBlocksLabel(s,p){ const r=[]; if(sumBlockQty(s,[/후지내측지/i,/\bMBB\b/i])>0)r.push(`${p?p+"-":""}MBB ${fmt1(sumBlockQty(s,[/후지내측지/i,/\bMBB\b/i]))}`); if(sumBlockQty(s,[/선택근신경근/i,/\bSNRB\b/i])>0)r.push(`${p?p+"-":""}SNRB ${fmt1(sumBlockQty(s,[/선택근신경근/i,/\bSNRB\b/i]))}`); if(sumBlockQty(s,[/추간관절/i,/\bFJB\b/i])>0)r.push(`${p?p+"-":""}FJB ${fmt1(sumBlockQty(s,[/추간관절/i,/\bFJB\b/i]))}`); if(sumBlockQty(s,[/경막외|EPIDURO|EPI\b/i])>0)r.push(`${p?p+"-":""}EPI ${fmt1(sumBlockQty(s,[/경막외|EPIDURO|EPI\b/i]))}`); if(sumBlockQty(s,[/견갑신경/i,/\bSSNB\b/i])>0)r.push(`SSNB ${fmt1(sumBlockQty(s,[/견갑신경/i,/\bSSNB\b/i]))}`); if(sumBlockQty(s,[/대퇴신경/i,/\bFNB\b/i])>0)r.push(`FNB ${fmt1(sumBlockQty(s,[/대퇴신경/i,/\bFNB\b/i]))}`); if(sumBlockQty(s,[/외측대퇴피/i,/\bLFCNB\b/i])>0)r.push(`LFCNB ${fmt1(sumBlockQty(s,[/외측대퇴피/i,/\bLFCNB\b/i]))}`); if(sumBlockQty(s,[/요천골신경총/i,/\bPCB\b/i])>0)r.push(`PCB ${fmt1(sumBlockQty(s,[/요천골신경총/i,/\bPCB\b/i]))}`); if(sumBlockQty(s,[/좌골신경/i,/\bSCNB\b/i])>0)r.push(`SCNB ${fmt1(sumBlockQty(s,[/좌골신경/i,/\bSCNB\b/i]))}`); if(sumBlockQty(s,[/액와신경차단/i,/\bANB\b/i])>0)r.push(`ANB ${fmt1(sumBlockQty(s,[/액와신경차단/i,/\bANB\b/i]))}`); if(sumBlockQty(s,[/액와하부|digital|median|ulnar|radial/i,/\bAPNB\b/i])>0)r.push(`APNB ${fmt1(sumBlockQty(s,[/액와하부|digital|median|ulnar|radial/i,/\bAPNB\b/i]))}`); if(sumBlockQty(s,[/척수신경후지/i,/\bPDNB\b/i,/^LA357$/i])>0)r.push(`PDNB ${fmt1(sumBlockQty(s,[/척수신경후지/i,/\bPDNB\b/i,/^LA357$/i]))}`); return r; }
+    function extractTierFromNameOrMeta(s,f){ if(s){ const c=[s.tier,s.t,s.target,s.amt,s.price]; for(const v of c){ const n=parseFloat(v); if(!isNaN(n)&&n>=1&&n<100)return Math.round(n*10)/10; } let m=String(s.n||"").replace(/\+\s*0\.\d{3}\.\d{3}/g," ").replace(/0\.\d{3}\.\d{3}/g," "); const l=m.match(/\b\d{1,2}\.\d\b/g)||[]; for(const v of l){ const n=parseFloat(v); if(!isNaN(n)&&n>=1&&n<100)return Math.round(n*10)/10; } const k=m.match(/(\d{1,3}(?:,\d{3})+)\s*원/); if(k){ const w=parseInt(k[1].replace(/,/g,''),10); if(!isNaN(w)&&w>0)return Math.round((w/10000)*10)/10; } } if(f&&f>0)return Math.round((f/10000)*10)/10; return null; }
+    function calcFinalPayForSet(s){ let b=0,n=0; if(currentConsult&&currentConsult!=="none") b+=CONSULT_PRICES[currentConsult]||0; const i=(s&&s.it)?s.it:[]; i.forEach(x=>{ const c=normalizeCodeForLookup((x&&x.c!=null)?String(x.c):""); const m=(x&&x.n!=null)?String(x.n):""; const q=parseFloat(x.q)||0; let info=DB.fee[c]||DB.drug[c]||DB.mat[c]; let p=info?info[1]:0; if(STRATEGY_DRUGS&&STRATEGY_DRUGS.some(d=>m.includes(d))) p=100000; if(!!(x.nb)||/SONO|C-ARM/i.test(c)) n+=(p*q); else b+=(p*q); }); const bp=Math.floor(Math.floor(b*0.3)/10)*10; return {bSum:b,nbSum:n,bPay:bp,finalPay:Math.floor((bp+n)/10)*10}; }
+    function computeSetMeta(){ SET_META={}; if(!DB.sets)return; Object.keys(DB.sets).forEach(k=>{ let s=DB.sets[k]=normalizeSet(DB.sets[k]); const i=isInjectionSet(s), sp=inferSpineRegion(s), mt=detectMainTag(s); let p="기타"; const cq=sumBlockQty(s,[/후지내측지/i,/\bMBB\b/i])+sumBlockQty(s,[/선택근신경근/i,/\bSNRB\b/i])+sumBlockQty(s,[/추간관절/i,/\bFJB\b/i])+sumBlockQty(s,[/경막외|EPIDURO|\bEPI\b/i]); const pq=sumBlockQty(s,[/척수신경후지/i,/\bPDNB\b/i]); const pp=inferPeripheralPart(s), sk=(x)=>(x==="C"?"경추":(x==="T"?"흉추":(x==="L"?"요추":""))); if(i){ if(cq>0) p=sk(sp)||"요추"; else if(pp&&pp!=="기타") p=pp; else if(pq>0) p=sk(sp)||"요추"; else p=pp||"기타"; } else p=pp||"기타"; const bl=buildBlocksLabel(s,sp), cr=calcFinalPayForSet(s), tr=extractTierFromNameOrMeta(s,cr.finalPay); let l=`[${k}] ${s.n||""}`.replace(/\+\s*0\.\d{3}\.\d{3}/g,"").replace(/\s{2,}/g," ").trim(); const fl=(CURRENT_SET_FILE||"").toLowerCase(); if(fl==="set_databaset.json"||fl==="신경차단술 조합.json"){ const rp=[]; if(mt)rp.push(mt); bl.forEach(b=>rp.push(b)); l=`[${p}] ${tr!=null?tr.toFixed(1):""}${rp.length?(" "+rp.join(" + ")):""}`.trim(); } if(!l||/^\[\s*\]/.test(l)){ l=((s&&s.n)?s.n:k)||""; l=String(l).replace(/\s{2,}/g," ").trim(); } const oi=PART_ORDER.indexOf(p), skey=(oi<0?999:oi).toString().padStart(3,"0")+"_"+k; SET_META[k]={label:l,search:(k+" "+(s.n||"")+" "+l+" "+p+" "+bl.join(" ")).toUpperCase(),part:p,sortKey:skey,isInj:i}; }); }
+    function toggleInjectionOnly(){ INJ_ONLY=!!document.getElementById('injOnlyToggle')?.checked; refreshSetCodes(); const i=document.getElementById('setSearchInput'); if(i&&i.value)searchSets(i.value,i); }
+    function refreshSetCodes(){ const s=document.getElementById('setSel'); if(!s)return; const pv=s.value; if(!DB.sets||Object.keys(DB.sets).length===0){ s.innerHTML='<option value="">-- 처방 코드를 선택하세요 --</option>'; return; } computeSetMeta(); let k=Object.keys(DB.sets); if(INJ_ONLY) k=k.filter(x=>SET_META[x]&&SET_META[x].isInj); k.sort((a,b)=>(SET_META[a]?.sortKey||a).localeCompare(SET_META[b]?.sortKey||b)); const bp={}; k.forEach(x=>{ const p=SET_META[x]?.part||"기타"; (bp[p]||=[]).push(x); }); const o=PART_ORDER.filter(p=>bp[p]&&bp[p].length); let h='<option value="">-- 처방 코드를 선택하세요 --</option>'; o.forEach(p=>{ h+=`<option value="" disabled>── ${p} ──</option>`; bp[p].forEach(x=>{ h+=`<option value="${x}">${SET_META[x]?.label||""}</option>`; }); }); const r=k.filter(x=>!o.includes(SET_META[x]?.part||"기타")); if(r.length){ h+=`<option value="" disabled>── 기타 ──</option>`; r.forEach(x=>{ h+=`<option value="${x}">${SET_META[x]?.label||""}</option>`; }); } s.innerHTML=h; if(pv&&DB.sets[pv])s.value=pv; }
+    
+    let CURRENT_SET_FILE = "";
+    async function changeSetFile() { const s=document.getElementById('setFileSel'); const f=s?s.value:""; if(!f)return; try{ document.getElementById('setFileStatus').innerText="로딩..."; const r=await fetchJsonFromGithub(f); const d=unwrapData(r); DB.sets=(d&&typeof d==='object')?d:{}; CURRENT_SET_FILE=f; document.getElementById('setFileStatus').innerText=setFileDisplayName(f)+` (${Object.keys(DB.sets).length}개)`; computeSetMeta(); refreshSetCodes(); document.getElementById('setSel').value=""; document.getElementById('dataView').style.display='none'; currentCustomItems=[]; deletedSetItems.clear(); document.getElementById('ccSwitch').checked=true; document.getElementById('ccContent').style.display='block'; }catch(e){ console.error(e); document.getElementById('setFileStatus').innerText="로드 실패"; DB.sets={}; refreshSetCodes(); } }
+    function dbHasCode(c){ return !!((DB.fee&&DB.fee[c])||(DB.drug&&DB.drug[c])||(DB.mat&&DB.mat[c])); }
+    function looksLikeCC(c,n){ c=(c||"").toString().trim(); n=(n||"").toString().trim(); if(!c&&!n)return true; if(/^\d+$/.test(c)&&c.length<=3)return true; if(/^\d+\.\s*/.test(n))return true; if(/^▼.*▼$/.test(n))return true; if(n.startsWith("*"))return true; if(n.endsWith(":"))return true; if(["PLAN","F/U","경과일","다음 주사일","주기치료사"].some(h=>n.toUpperCase().includes(h)))return true; return false; }
+    function looksLikeDiagnosis(c,n){ if(dbHasCode(c))return false; if(!/^[A-Z]{1,2}\d{2,5}$/.test(c))return false; n=(n||"").toString(); if(["술","검사","촬영","초음파","주사","차단","도수","물리","치료","시술","테이핑","C-ARM","MRI","X-RAY","XRAY","Xray"].some(h=>n.includes(h)))return false; if(["주","mg","ml","g","tab","cap","정","캡슐","앰플","vial","바이알","브릭스","io","block"].some(h=>n.toUpperCase().includes(h.toUpperCase())))return false; return true; }
+    function normalizeSet(s){ if(!s||typeof s!=='object')return s; if(s.__normalized)return s; const cc=Array.isArray(s.cc)?[...s.cc]:[]; const dg=Array.isArray(s.dg)?[...s.dg]:[]; const it=[]; (s.it||[]).forEach(x=>{ const c=(x&&x.c!=null)?String(x.c).trim():""; const n=(x&&x.n!=null)?String(x.n).trim():""; const cu=c.toUpperCase(); if(/^\d+$/.test(c)&&n==="")return; if(looksLikeCC(c,n)){ if(n)cc.push(n); return; } if(looksLikeDiagnosis(cu,n)){ dg.push({c:c,n:n||c}); return; } it.push(x); }); return {...s,cc,dg,it,__normalized:true}; }
+    
+    async function init(){ try{ DB={fee:{},drug:{},mat:{},sets:{},dates:{}}; let d=null; 
+        try{const f=await fetchJsonFromGithub("fee.json"); DB.fee=unwrapData(f);}catch(e){} 
+        try{const dr=await fetchJsonFromGithub("drug.json"); DB.drug=unwrapData(dr);}catch(e){} 
+        try{const m=await fetchJsonFromGithub("mat.json"); DB.mat=unwrapData(m);}catch(e){} 
+        let overrideRaw = null;
+        try{ overrideRaw = await fetchJsonFromGithub("override.json"); } catch(e) {}
+        const overrideObj = overrideRaw ? unwrapData(overrideRaw) : null;
+        const BUILTIN_OVERRIDE = { drug: {"LIDO2":["리도카인염산 20ml 2% (휴온스)",649,"670603485"],"NS100":["대한멸균생리식염수(0.9% 100mL)",1110,"645100562"],"DW100":["포도당주사액(5%) 100mL",1188,"645100973"]} };
+        function applyOverrides(ov){ if(!ov) return; ["fee","drug","mat"].forEach(k=>{ if(ov[k]) Object.keys(ov[k]).forEach(c=>DB[k][c.toUpperCase()]=ov[k][c]); }); }
+        applyOverrides(BUILTIN_OVERRIDE); applyOverrides(overrideObj);
+        try{ 
+            if(!DB.fee||Object.keys(DB.fee).length===0){
+                const resAll = await fetch(RAW_BASE + "database.json?t=" + Date.now());
+                if(resAll.ok){ const dbAll=await resAll.json(); if(dbAll){ if(dbAll.fee)DB.fee=dbAll.fee; if(dbAll.drug)DB.drug=dbAll.drug; if(dbAll.mat)DB.mat=dbAll.mat; if(dbAll.dates)d=dbAll.dates; }}
+            }
+        }catch(e){} 
+        if(d)DB.dates=d; 
+        document.getElementById('st-date').innerText=DB.dates?.fee||"-"; 
+        const f1=getFeePrice('AA154')||17610; const f2=getFeePrice('AA254')||12590; CONSULT_PRICES={first:f1,follow:f2}; 
+        document.getElementById('btn-first').innerText=`초진 (${fmt(f1)})`; document.getElementById('btn-follow').innerText=`재진 (${fmt(f2)})`; 
+        flatDB=[]; ["fee","drug","mat"].forEach(k=>{ if(DB[k]) for(let c in DB[k]) flatDB.push({code:c,name:DB[k][c][0],price:DB[k][c][1]}); }); 
+        document.getElementById('st-db').innerText=fmt(flatDB.length)+"건"; 
+        refreshSetCodes(); 
+        const files=await listSetFiles(); 
+        const ss=document.getElementById('setFileSel'); 
+        if(ss){ 
+            if(!files.length){ ss.innerHTML='<option value="">set*.json 없음</option>'; document.getElementById('setFileStatus').innerText="-"; }
+            else{ 
+                const nm=files.slice().sort((a,b)=>{ const al=a.toLowerCase(),bl=b.toLowerCase(); if(al==="set_databaset.json")return -1; if(bl==="set_databaset.json")return 1; return al.localeCompare(bl); }); 
+                let html=""; nm.forEach(f=>html+=`<option value="${f}">${setFileDisplayName(f)}</option>`); ss.innerHTML=html; 
+                ss.value=nm.find(f=>f.toLowerCase()==="set_databaset.json"||f.toLowerCase()==="신경차단술 조합.json")||nm[0]; 
+                await changeSetFile(); 
+            } 
+        } 
+    }catch(e){console.error(e);} }
+
+    function getFeePrice(c){ if(DB.fee&&DB.fee[c])return DB.fee[c][1]; if(DB.fee){ const k=Object.keys(DB.fee).find(x=>x.startsWith(c)); if(k)return DB.fee[k][1]; } return 0; }
+    function setTarget(v){ document.getElementById('tAmt').value=v; autoBalance(); }
+    function changeSet(){ 
+        const tbody = document.getElementById('itemList');
+        tbody.innerHTML = '';
+        renderBlockAdjuster(); 
+        const k=document.getElementById('setSel').value; if(!k)return; 
+        setConsult('follow'); 
+        let s=DB.sets[k]; s=normalizeSet(s); DB.sets[k]=s; 
+        document.getElementById('dataView').style.display='block'; 
+        document.getElementById('ccContent').innerHTML=(s.cc&&s.cc.length)?s.cc.join('<br>'):"등록된 증상 없음"; 
+        const sw=document.getElementById('ccSwitch'); document.getElementById('ccContent').style.display=sw.checked?'block':'none'; 
+        renderItems(); 
+    }
+    function setConsult(t){ currentConsult=t; document.querySelectorAll('.c-btn').forEach(b=>b.classList.remove('active')); document.getElementById('btn-'+t).classList.add('active'); computeSetMeta(); refreshSetCodes(); renderItems(); }
+    function toggleCC(){ const b=document.getElementById('ccContent'); const s=document.getElementById('ccSwitch'); b.style.display=s.checked?'block':'none'; }
+    function searchSets(v,e){ activeInputEl=e; const l=document.getElementById('globalSearchLayer'); if(!v||v.length<1){l.style.display='none';return;} computeSetMeta(); const r=e.getBoundingClientRect(); l.style.top=(r.bottom+window.scrollY+5)+'px'; l.style.left=(r.left+window.scrollX)+'px'; l.style.width=Math.max(300,r.width)+'px'; const q=v.toUpperCase(); let k=Object.keys(DB.sets || {}); if(INJ_ONLY)k=k.filter(x=>SET_META[x]&&SET_META[x].isInj); const f=k.filter(x=>SET_META[x]?.search.includes(q)).slice(0,40); l.innerHTML=f.map(x=>`<div class="search-item" onclick="selectSetFromSearch('${x}')"><span style="color:#0052cc; font-weight:900;">${SET_META[x]?.label||""}</span></div>`).join(''); l.style.display=f.length?'block':'none'; }
+    function selectSetFromSearch(k){ document.getElementById('setSel').value=k; document.getElementById('setSearchInput').value=''; clearSearch(); changeSet(); }
+    function searchLive(v,m,e){ activeInputEl=e; const l=document.getElementById('globalSearchLayer'); if(!v||v.length<2){l.style.display='none';return;} const r=e.getBoundingClientRect(); l.style.top=(r.bottom+window.scrollY+5)+'px'; l.style.left=(r.left+window.scrollX)+'px'; l.style.width=Math.max(300,r.width)+'px'; const f=flatDB.filter(i=>i.code.includes(v.toUpperCase())||i.name.includes(v)).slice(0,30); l.innerHTML=f.map(i=>`<div class="search-item" onclick="selectItem('${i.code}','${i.name.replace(/'/g,"\\'")}','${i.price}','${m}')"><span style="color:#0052cc;font-weight:800;">${i.code}</span><span style="flex:1;margin:0 10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${i.name}</span><b>${fmt(i.price)}</b></div>`).join(''); l.style.display=f.length?'block':'none'; }
+    function selectItem(c,n,p,m){ const l=document.getElementById('globalSearchLayer'); if(m==='main')addSearchedItem(c,n,p); else if(m==='cell'&&activeInputEl){ const tr=activeInputEl.closest('tr'); const ci=tr.querySelector('.box-input.code-type'); ci.value=c; updateRowByCode(ci,tr.dataset.custom==='true',tr.dataset.idx); } l.style.display='none'; activeInputEl=null; }
+    function clearSearch(){ document.getElementById('globalSearchLayer').style.display='none'; }
+    function closeSearch(e){ if(!e.target.closest('#searchBox')&&!e.target.closest('.input-wrapper')&&!e.target.closest('.set-selector-group')&&!e.target.closest('.search-dropdown')) clearSearch(); }
+    function addSearchedItem(c,n,p){ let fp=p; if(STRATEGY_DRUGS.some(d=>n.includes(d)))fp=100000; currentCustomItems.push({code:c,name:n,price:fp,q:1,nb:false,lock:false,isManual:false}); clearSearch(); document.getElementById('searchInput').value=''; renderItems(); }
+    function addManualItem(){ currentCustomItems.push({code:"ETC",name:"임의 항목",price:0,q:1,nb:false,lock:false,isManual:true}); renderItems(); }
+    function renderItems(){ const t=document.getElementById('itemList'); t.innerHTML=''; renderBlockAdjuster(); const k=document.getElementById('setSel').value; if(!k)return; let s=DB.sets[k]; s=normalizeSet(s); DB.sets[k]=s; const dgl=s.dg||[]; const dgs=document.getElementById('diagSection'); const dgt=document.getElementById('diagList'); dgt.innerHTML=''; if(dgl.length>0){ dgs.style.display='block'; dgl.forEach(d=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td class="diag-code">${d.c}</td><td>${d.n}</td>`; dgt.appendChild(tr); }); }else{ dgs.style.display='none'; } if(currentConsult!=="none"){ const cc=(currentConsult==='first')?"AA154":"AA254"; const dp=getFeePrice(cc); const p=dp||CONSULT_PRICES[currentConsult]||0; const dn=(DB.fee&&DB.fee[cc]&&DB.fee[cc][0])?DB.fee[cc][0]:null; const n=dn||((currentConsult==='first')?"진찰료(초진)":"진찰료(재진)"); const u=dp?cc:"CONST"; addRow(t,u,n,p,1,false,true,false); } s.it.forEach(i=>{ const c=i.c.toUpperCase(); if(deletedSetItems.has(c))return; if(carryOverItems.has(c)){ const v=carryOverItems.get(c); addRow(t,c,v.name,v.price,v.q,v.nb,v.lock,true); }else{ const info=DB.fee[c]||DB.drug[c]||DB.mat[c]||null; let n=info?info[0]:(i.n||c); let p=info?info[1]:0; if(STRATEGY_DRUGS.some(d=>n.includes(d)))p=100000; addRow(t,c,n,p,i.q,i.nb,!i.nb||c.includes('SONO')||c.includes('C-ARM'),false); } }); currentCustomItems.forEach((i,x)=>{ if(carryOverItems.has(i.code))return; if(i.isDeleted)return; addRow(t,i.code,i.name,i.price,i.q,i.nb,i.lock,false,true,x); }); carryOverItems.forEach((v,c)=>{ const e=Array.from(t.rows).some(r=>r.cells[0].innerText===c); if(!e) addRow(t,c,v.name,v.price,v.q,v.nb,v.lock,true); }); autoBalance(); renderBlockAdjuster(); }
+    function addRow(t,c,n,p,q,nb,lk,cy,isC=false,idx=null){ const tr=document.createElement('tr'); tr.dataset.type=nb?'nb':'b'; tr.dataset.code=c; if(isC){tr.dataset.custom='true';tr.dataset.idx=idx;} let nh=`<div class="input-wrapper"><input class="box-input" value="${n}" oninput="searchLive(this.value,'cell',this)" onfocus="searchLive(this.value,'cell',this)">`; if(CONTRAST_REQUIRED_CODES.includes(c)||c.startsWith('HA')) nh+=`<span class="badge badge-req">조영필요</span>`; if(CONTRAST_KEYWORDS.some(k=>n.toUpperCase().includes(k))) nh+=`<span class="badge badge-con">조영제</span>`; nh+=`</div><div class="audit-msg" style="color:var(--accent);font-size:11px;font-weight:800;margin-top:2px;"></div>`; const b=`<button class="type-btn ${nb?'type-nb':'type-b'}" onclick="toggleType(this,'${c}',${isC},${idx})">${nb?'비급여':'급여'}</button>`; tr.innerHTML=`<td><div class="input-wrapper"><input class="box-input code-type" value="${c}" onchange="updateRowByCode(this,${isC},${idx})" oninput="searchLive(this.value,'cell',this)"></div></td><td>${nh}</td><td><input class="box-input-num p-input" value="${fmt(p)}" oninput="syncRow(this,'${c}',${isC},${idx})"></td><td><input class="box-input-num q-input" type="number" value="${q}" step="0.1" oninput="syncRow(this,'${c}',${isC},${idx})"></td><td>${b}</td><td><button class="carry-btn ${cy?'active':''}" onclick="toggleCarry(this,'${c}')">📌</button></td><td><button class="del-btn" onclick="deleteRow(this,'${c}',${isC},${idx})">🗑️</button></td>`; t.appendChild(tr); }
+    function updateRowByCode(i,isC,idx){ const nc=i.value.toUpperCase(); const tr=i.closest('tr'); const f=flatDB.find(x=>x.code===nc); if(f){ tr.querySelector('.box-input:not(.code-type)').value=f.name; tr.querySelector('.p-input').value=fmt(f.price); tr.dataset.code=nc; if(isC&&idx!==null){ currentCustomItems[idx].code=nc; currentCustomItems[idx].name=f.name; currentCustomItems[idx].price=f.price; } } autoBalance(); renderBlockAdjuster(); }
+    function toggleType(b,c,isC,idx){ const tr=b.closest('tr'); const n=b.innerText==='급여'; b.innerText=n?'비급여':'급여'; b.className=`type-btn ${n?'type-nb':'type-b'}`; tr.dataset.type=n?'nb':'b'; if(carryOverItems.has(c))carryOverItems.get(c).nb=n; if(isC&&idx!==null)currentCustomItems[idx].nb=n; autoBalance(); }
+    function deleteRow(b,c,isC,idx){ if(carryOverItems.has(c))carryOverItems.delete(c); if(isC&&idx!==null){ currentCustomItems.splice(idx,1); }else{ deletedSetItems.add(c); } renderItems(); }
+    function syncRow(e,c,isC,idx){ const tr=e.closest('tr'); const p=clean(tr.querySelector('.p-input').value); const q=parseFloat(tr.querySelector('.q-input').value)||0; if(carryOverItems.has(c)){ const v=carryOverItems.get(c); v.price=p; v.q=q; } if(isC&&idx!==null){ currentCustomItems[idx].price=p; currentCustomItems[idx].q=q; } if(e.classList.contains('p-input'))e.value=fmt(p); autoBalance(); }
+    function toggleCarry(b,c){ const tr=b.closest('tr'); b.classList.toggle('active'); const cc=tr.querySelector('.box-input.code-type').value; if(b.classList.contains('active')){ carryOverItems.set(cc,{name:tr.querySelector('.box-input:not(.code-type)').value, price:clean(tr.querySelector('.p-input').value), q:parseFloat(tr.querySelector('.q-input').value)||0, nb:tr.dataset.type==='nb', lock:false}); }else{ carryOverItems.delete(c); } }
+    function calc(){ let b=0,n=0,ls=0; let hc=false; let nc=null; document.querySelectorAll('#itemList tr').forEach(r=>{ const nm=r.querySelector('.box-input:not(.code-type)').value.toUpperCase(); if(CONTRAST_KEYWORDS.some(k=>nm.includes(k)))hc=true; }); document.querySelectorAll('#itemList tr').forEach(r=>{ const c=r.querySelector('.box-input.code-type').value.toUpperCase(); const p=clean(r.querySelector('.p-input').value); const q=parseFloat(r.querySelector('.q-input').value)||0; const m=r.querySelector('.audit-msg'); m.innerText=""; if(c.startsWith('LA')){ ls+=q; if(c==='LA357'&&q>1.5)m.innerText="⚠️ LA357 1.5 초과"; } if(CONTRAST_REQUIRED_CODES.includes(c)&&!hc)nc=c; if(r.dataset.type==='b')b+=(p*q); else n+=(p*q); }); const ab=document.getElementById('mainAlertBox'); let al=[]; if(ls>3.0)al.push("⚠️ 차단술 총 합계가 3.0을 초과했습니다. (삭감 주의)"); if(nc)al.push("⚠️ 조영제가 누락되었습니다. (필수 시술 포함됨)"); if(al.length>0){ ab.innerHTML=al.join("<br>"); ab.style.display="block"; ab.className=ls>3.0?"alert-box alert-red":"alert-box alert-orange"; }else{ ab.style.display="none"; } const bp=Math.floor(Math.floor(b*0.3)/10)*10; return {totalFull:Math.floor(b+n),bPay:bp,nbSum:Math.floor(n),finalPay:Math.floor((bp+n)/10)*10}; }
+    function autoBalance(){ const t=clean(document.getElementById('tAmt').value); const rs=calc(); const rows=Array.from(document.querySelectorAll('#itemList tr')); let tr=rows.find(r=>r.dataset.type==='nb'&&STRATEGY_DRUGS.some(d=>r.querySelector('.box-input:not(.code-type)').value.includes(d))); if(!tr){ const rr=[...rows].reverse(); tr=rr.find(r=>r.dataset.type==='nb'); } if(tr){ const an=tr.querySelector('.box-input:not(.code-type)').value; document.getElementById('matrixAdjustName').innerText=`[조정: ${an}]`; let on=0; rows.forEach(r=>{ if(r!==tr&&r.dataset.type==='nb')on+=clean(r.querySelector('.p-input').value)*(parseFloat(r.querySelector('.q-input').value)||0); }); const pa=clean(tr.querySelector('.p-input').value); if(pa>0){ tr.querySelector('.q-input').value=((t-rs.bPay-on)/pa).toFixed(4); let mh=''; const bt=t%10000; const sp=Math.max(0,Math.floor(t/10000)*10000-50000); const ep=Math.floor(t/10000)*10000+20000; for(let i=sp;i<=ep;i+=10000){ const pt=i+bt; const qp=((pt-rs.bPay-on)/pa).toFixed(4); if(qp>=0){ const bs=(pt===t)?"background:#eef6ff; border-color:var(--blue);":""; mh+=`<div class="matrix-row" onclick="setTarget(${pt})" style="${bs}"><span class="matrix-target">${fmt(pt)}원</span><span class="matrix-val">수량 ${qp}</span></div>`; } } document.getElementById('matrixTable').innerHTML=mh; } } const f=calc(); document.getElementById('totalFull').innerText=fmt(f.totalFull); document.getElementById('summaryBenefit').innerText=fmt(f.bPay); document.getElementById('summaryNonBenefit').innerText=fmt(f.nbSum); document.getElementById('finalPay').innerText=fmt(f.finalPay); }
+    window.onload=init;
+    function getLArows(){ return Array.from(document.querySelectorAll('#itemList tr')).filter(r=>{ const c=(r.dataset.code||'').toUpperCase(); const i=r.querySelector('.box-input.code-type').value.toUpperCase(); return c.startsWith('LA')||i.startsWith('LA'); }); }
+    function renderBlockAdjuster(){ const l=getLArows(); const c=l.length; const dc=Math.max(3,c); let h='<div class="section-title" style="border-left-color: var(--blue);">차단술 수량 조정</div>'; for(let i=0;i<dc;i++){ const e=(i<c); let lb=`${i+1}차단술`; let nm=""; let dis=""; if(e){ const tr=l[i]; const rn=tr.querySelector('.box-input:not(.code-type)').value; nm=`(${rn})`; }else{ nm=`<span style="color:#aaa;font-weight:normal;">(없음)</span>`; dis="disabled style='opacity:0.3;cursor:default;'"; } h+=`<div class="block-adjust-row"><div class="block-adjust-label" title="${nm.replace(/<[^>]*>/g,'')}">${lb} <span style="font-size:0.9em;margin-left:4px;">${nm}</span></div><div class="block-adjust-ctrl"><button class="block-btn" ${dis} onclick="adjustBlockByIndex(${i},-1)">−</button><input id="blockStep_${i}" class="block-step" type="number" value="0.25" step="0.05" ${dis}><button class="block-btn" ${dis} onclick="adjustBlockByIndex(${i},+1)">＋</button></div></div>`; } document.getElementById('blockAdjustWrap').innerHTML=h; }
+    function adjustBlockByIndex(i,d){ const l=getLArows(); if(!l[i])return; const tr=l[i]; const c=(tr.dataset.code||'').toUpperCase(); const iv=tr.querySelector('.box-input.code-type').value.toUpperCase(); if(!c.startsWith('LA')&&!iv.startsWith('LA')) return; const se=document.getElementById(`blockStep_${i}`); const s=se?(parseFloat(se.value)||0):0; if(!s)return; const qe=tr.querySelector('.q-input'); if(!qe)return; const cur=parseFloat(qe.value)||0; let n=cur+(d*s); if(n<0)n=0; n=Math.round(n*100)/100; qe.value=n.toFixed(2).replace(/\.00$/,'\.0').replace(/(\.\d)0$/,'$1'); const isc=tr.dataset.custom==='true'; const idx=isc?parseInt(tr.dataset.idx,10):null; try{ syncRow(qe,c||iv,isc,idx); }catch(e){} }
+</script>
+</body>
+</html>
