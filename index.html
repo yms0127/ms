@@ -2,318 +2,187 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>외래 통계 자동 계산</title>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <title>JINSUL · 통계 계산기 선택</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; max-width: 1200px; margin: auto; }
-    h2 { color: #2c3e50; }
-    table { border-collapse: collapse; width: 100%; margin-top: 15px; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-    th { background-color: #f4f4f4; }
-    .section { margin-bottom: 40px; }
-    input[type="file"] { margin-bottom: 10px; }
-    button { margin-top: 10px; padding: 8px 16px; font-size: 16px; cursor: pointer; }
-  </style>
-</head>
+    :root{
+      /* 배경색 (회색조) */
+      --bg:#f6f6f7;
+      
+      /* [핵심 수정] 카드 배경: 흰색이지만 10%만 불투명하게 (뒤가 비침) */
+      --card: rgba(255, 255, 255, 0.10);
+      
+      --text:#111827;
+      --muted:#6b7280;
+      --border:#e5e7eb;
+      --hover:#f9fafb;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; 
+      background:var(--bg); 
+      color:var(--text); 
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,'Apple SD Gothic Neo','Noto Sans KR',Arial,sans-serif;
+    }
+
+    /* 워터마크 (배경 로고) */
+    .wm{
+      position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+      pointer-events:none; z-index:0;
+    }
+    .wm img{
+      width:min(760px, 78vw);
+      opacity:0.1; /* 투명도 10% */
+      user-select:none;
+      filter: grayscale(1) saturate(0) brightness(.65) contrast(1.05);
+    }
+    body > *{ position:relative; z-index:1; }
+
+    /* 헤더 */
+    header{padding:40px 16px 0; text-align:center;}
+    header .logo{
+      width:170px; max-width:70vw; height:auto; display:block; margin:0 auto 10px;
+      filter: grayscale(1) saturate(0) brightness(.45) contrast(1.15);
+    }
+    h1{margin:10px 0 30px; font-size:24px; font-weight:800; color:#0f172a;}
+    
+    .wrap{max-width:980px; margin:0 auto; padding:20px 16px 60px}
+    
+    .sec-title{ margin:0 4px 14px; font-size:16px; color:var(--text); font-weight:800; letter-spacing:-.2px; }
+    .grid{display:grid; gap:24px; grid-template-columns:repeat(2,1fr);}
+    
+    /* 카드 스타일 */
+    .card{
+      background:var(--card); /* 투명 배경 적용 */
+      backdrop-filter: blur(1px); /* 유리 효과 (뒤가 흐릿하게 보임) */
+      border:1px solid var(--border);
+      border-radius:20px;
+      padding:30px;
+      box-shadow:0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
+      transition:transform .2s ease, box-shadow .2s ease;
+      display:flex; flex-direction:column; align-items:flex-start;
+    }
+    .card:hover{
+      transform:translateY(-4px); 
+      box-shadow:0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.04);
+      background: rgba(255, 255, 255, 0.85); /* 호버시 약간 더 밝게 */
+    }
+    
+    .icon{
+      width:48px; height:48px; border-radius:14px; display:flex; align-items:center; justify-content:center;
+      background:rgba(255,255,255,0.6); border:1px solid rgba(0,0,0,0.05);
+      color:#1f2937; margin-bottom:18px;
+    }
+    .card h3{margin:0 0 10px; font-size:19px; font-weight:700; color:#111827;}
+    .card p{margin:0 0 24px; color:var(--muted); font-size:15px; line-height:1.6;}
+    
+    /* 텍스트 내 강조 박스 스타일 */
+    .card p code{
+      background:rgba(0,0,0,0.04); padding:2px 4px; border-radius:4px; 
+      font-family:inherit; font-weight:600; font-size:0.95em; color:#374151;
+    }
+
+    /* 내용 상세 설명 리스트 */
+    .feature-list{
+      margin:0 0 24px; padding:0; list-style:none; width:100%;
+    }
+    .feature-list li{
+      position:relative; padding-left:20px; margin-bottom:8px; font-size:13px; color:#4b5563;
+    }
+    .feature-list li::before{
+      content:"•"; position:absolute; left:4px; color:#9ca3af;
+    }
+
+    /* 버튼 스타일 */
+    .btn{
+      margin-top:auto;
+      display:inline-flex; align-items:center; justify-content:center; width:100%;
+      padding:14px; border-radius:12px; border:1px solid #cffafe;
+      background:linear-gradient(to bottom right, #ecfeff, #cfFAFE);
+      color:#0e7490; font-weight:700; font-size:15px; text-decoration:none;
+      cursor:pointer; transition:all .2s;
+      box-shadow:0 2px 5px rgba(6,182,212,0.1);
+    }
+    .btn:hover{ 
+      background:linear-gradient(to bottom right, #cffafe, #a5f3fc);
+      transform:translateY(-1px);
+      box-shadow:0 4px 8px rgba(6,182,212,0.2);
+    }
+
+    footer{margin-top:60px; text-align:center; color:#9ca3af; font-size:12px;}
+    
+    @media (max-width:768px){ .grid{grid-template-columns:1fr} }
+  </style></head>
 <body>
-  <h1>외래 통계 자동 계산</h1>
-  <p>※ 헤더 없는 엑셀 파일 3개를 아래 순서대로 업로드하세요.</p>
-  <div class="section">
-    <label>1. 내원경로.xlsx (A열: 내원경로, B열: 차트번호)</label><br />
-    <input type="file" id="filePath" accept=".xlsx" />
+  <div class="wm" aria-hidden="true"><img src="jinsul-logo.png" alt=""></div>
+
+  <header>
+    <img src="jinsul-logo.png" alt="JINSUL" class="logo" />
+    <h1>JINSUL 통계 계산기 선택</h1>
+    <p class="sub">경험과 가치를 현실화하는 컨설팅</p>
+  </header>
+
+  <div class="wrap">
+    <h2 class="sec-title">통계 계산기</h2>
+    <div class="grid">
+      <div class="card">
+        <div class="icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M4 19V5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M4 19H20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M8 17V12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M12 17V9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M16 17V6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <h3>비트 통계 계산기</h3>
+        <p>외래 엑셀/CSV 업로드로 초·재진, 주사, 내원 지표를 자동 계산합니다.</p>
+        <a class="btn" href="bitchart.html">비트 계산기 열기</a>
+      </div>
+
+      <div class="card">
+        <div class="icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M4 19V5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M4 19H20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M8 17V10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M12 17V13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M16 17V7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M19 6l-3 1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <h3>의사랑 통계 계산기</h3>
+        <p>진료실 다중 파일 + 주사(b) + 내원(v) 통합 분석, 연령·회차 분포 제공.</p>
+        <a class="btn" href="ysarangchart.html">의사랑 계산기 열기</a>
+      </div>
+    </div>
+
+    <h2 class="sec-title" style="margin-top:26px;">1회 내원 확인</h2>
+    <div class="grid grid-compact">
+      <div class="card compact">
+        <div class="icon check" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h3>비트 · 1회 내원 확인</h3>
+        <p>비트 데이터에서 1회 내원(1visit) 대상 확인.</p>
+        <a class="btn" href="bit-1visit.html">비트 1회 내원 열기</a>
+      </div>
+
+      <div class="card compact">
+        <div class="icon check" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h3>의사랑 · 1회 내원 확인</h3>
+        <p>의사랑 데이터에서 1회 내원(1visit) 대상 확인.</p>
+        <a class="btn" href="ysarang-1visit.html">의사랑 1회 내원 열기</a>
+      </div>
+    </div>
+
+    <footer>© JINSUL · 경험과 가치를 현실화하는 컨설팅</footer>
   </div>
-  <div class="section">
-    <label>2. 외래환자.xlsx (D열: 차트번호, M열: 수납액)</label><br />
-    <input type="file" id="filePatient" accept=".xlsx" />
-  </div>
-  <div class="section">
-    <label>3. 일일집계.xlsx (C열: 차트번호, E열: 주민번호, J열: 신환/재진, L열: 접수시간)</label><br />
-    <input type="file" id="fileDaily" accept=".xlsx" />
-  </div>
-  <button id="processBtn">통계 생성</button>
-
-  <div id="results" style="display:none;">
-    <h2>1. 연령대별 수납액 (성별 포함)</h2>
-    <table id="ageSexTable">
-      <thead>
-        <tr><th>연령대</th><th>남자 수납액</th><th>여자 수납액</th><th>총 수납액</th></tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-
-    <h2>2. 시간대별 연령 통계</h2>
-    <table id="timeAgeTable">
-      <thead>
-        <tr>
-          <th>시간대</th><th>10대</th><th>20대</th><th>30대</th><th>40대</th><th>50대</th><th>60대</th><th>70대</th><th>80대</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-
-    <h2>3. 시간대별 성별 내원 통계</h2>
-    <table id="timeSexTable">
-      <thead><tr><th>시간대</th><th>남자 내원</th><th>여자 내원</th><th>총 내원</th></tr></thead>
-      <tbody></tbody>
-    </table>
-
-    <h2>4. 신환 / 재진 인원 통계</h2>
-    <table id="patientTypeTable">
-      <thead><tr><th>구분</th><th>인원 수</th></tr></thead>
-      <tbody></tbody>
-    </table>
-
-    <h2>5. 신환 내원경로별 수납액 및 평균</h2>
-    <table id="newPatientRouteTable">
-      <thead><tr><th>내원경로</th><th>총 수납액</th><th>평균 수납액</th><th>인원 수</th></tr></thead>
-      <tbody></tbody>
-    </table>
-  </div>
-
-  <script>
-    // 주민번호에서 연령 계산 (2025년 기준)
-    function getAgeFromRRN(rrn, 기준일 = new Date()) {
-      if (!rrn) return null;
-      const r = rrn.toString().replace(/[^0-9]/g, '');
-      if (r.length < 7) return null;
-      const yy = parseInt(r.substring(0, 2), 10);
-      const mm = parseInt(r.substring(2, 4), 10);
-      const dd = parseInt(r.substring(4, 6), 10);
-      const genderCode = r.charAt(6);
-      let yearPrefix = '';
-      if ('1257'.includes(genderCode)) yearPrefix = 1900;
-      else if ('3468'.includes(genderCode)) yearPrefix = 2000;
-      else return null;
-      const birthYear = yearPrefix + yy;
-      const birthDate = new Date(birthYear, mm - 1, dd);
-      let age = 기준일.getFullYear() - birthDate.getFullYear();
-      if (
-        기준일.getMonth() < birthDate.getMonth() ||
-        (기준일.getMonth() === birthDate.getMonth() && 기준일.getDate() < birthDate.getDate())
-      ) {
-        age--;
-      }
-      return age;
-    }
-
-    // 성별 판별
-    function getGenderFromRRN(rrn) {
-      if (!rrn) return null;
-      const r = rrn.toString().replace(/[^0-9]/g, '');
-      if (r.length < 7) return null;
-      const genderCode = r.charAt(6);
-      if ('1357'.includes(genderCode)) return '남자';
-      if ('2468'.includes(genderCode)) return '여자';
-      return null;
-    }
-
-    function formatNumber(num) {
-      return num.toLocaleString();
-    }
-
-    function getAgeGroup(age) {
-      if (age < 10) return null;
-      if (age < 20) return '10대';
-      if (age < 30) return '20대';
-      if (age < 40) return '30대';
-      if (age < 50) return '40대';
-      if (age < 60) return '50대';
-      if (age < 70) return '60대';
-      if (age < 80) return '70대';
-      return '80대';
-    }
-
-    function getHourGroup(dateTimeString) {
-      if (!dateTimeString) return null;
-      const dt = new Date(dateTimeString);
-      if (isNaN(dt)) return null;
-      const h = dt.getHours();
-      // 시간대별 구간 9~18시 기준, 9~10, 10~11 ... 18~19
-      return `${h}:00~${h + 1}:00`;
-    }
-
-    function parseExcelTime(serial) {
-      if (typeof serial === 'number') {
-        return new Date((serial - 25569) * 86400 * 1000);
-      }
-      return new Date(serial);
-    }
-
-    document.getElementById('processBtn').addEventListener('click', async () => {
-      const filePath = document.getElementById('filePath').files[0];
-      const filePatient = document.getElementById('filePatient').files[0];
-      const fileDaily = document.getElementById('fileDaily').files[0];
-      if (!filePath || !filePatient || !fileDaily) {
-        alert('3개 파일을 모두 업로드해주세요.');
-        return;
-      }
-
-      const [wbPath, wbPatient, wbDaily] = await Promise.all([
-        filePath.arrayBuffer().then(data => XLSX.read(data, {type:'array'})),
-        filePatient.arrayBuffer().then(data => XLSX.read(data, {type:'array'})),
-        fileDaily.arrayBuffer().then(data => XLSX.read(data, {type:'array'})),
-      ]);
-
-      const sheetPath = wbPath.Sheets[wbPath.SheetNames[0]];
-      const sheetPatient = wbPatient.Sheets[wbPatient.SheetNames[0]];
-      const sheetDaily = wbDaily.Sheets[wbDaily.SheetNames[0]];
-
-      const pathData = XLSX.utils.sheet_to_json(sheetPath, {header:1, defval:''});
-      const patientData = XLSX.utils.sheet_to_json(sheetPatient, {header:1, defval:''});
-      const dailyData = XLSX.utils.sheet_to_json(sheetDaily, {header:1, defval:''});
-
-      // 맵핑용 차트번호별 내원경로
-      const routeMap = new Map();
-      for(let i=0; i<pathData.length; i++) {
-        const route = pathData[i][0];   // A열: 내원경로
-        const chartNo = pathData[i][1]; // B열: 차트번호
-        if(chartNo) routeMap.set(chartNo.toString(), route);
-      }
-
-      // 맵핑용 차트번호별 주민번호, 신환재진, 접수시간
-      const dailyMap = new Map();
-      for(let i=0; i<dailyData.length; i++) {
-        const chartNo = dailyData[i][2]; // C열: 차트번호
-        const rrn = dailyData[i][4];     // E열: 주민번호
-        const patientTypeRaw = dailyData[i][9]; // J열: 신환/재진 구분
-        const patientType = (patientTypeRaw || '').toString().trim();
-        const timeRaw = dailyData[i][11]; // L열: 접수시간 (Excel serial or datetime string)
-        const time = timeRaw ? parseExcelTime(timeRaw) : null;
-
-        if(chartNo) dailyMap.set(chartNo.toString(), { rrn, patientType, time });
-      }
-
-      // 차트번호로 환자 데이터 매핑 + 수납액 등 가져오기
-      // 외래환자: D열(3) 차트번호, M열(12) 수납액
-      // 일일집계: 차트번호 매핑해서 주민번호, 신환재진, 접수시간 가져옴
-      // 내원경로: 차트번호 매핑해서 내원경로 가져옴
-
-      // 1. 연령대별 수납액 (성별 포함)
-      const ageSexSum = {};
-      const ageSexCount = {};
-      const ageGroups = ['10대','20대','30대','40대','50대','60대','70대','80대'];
-      for(const ag of ageGroups) {
-        ageSexSum[ag] = { 남자:0, 여자:0 };
-        ageSexCount[ag] = { 남자:0, 여자:0 };
-      }
-
-      // 2. 시간대별 연령
-      const timeAgeCount = {};
-      // 3. 시간대별 성별
-      const timeSexCount = {};
-
-      // 4. 신환/재진 인원
-      const patientTypeCount = { 신환:0, 재진:0 };
-
-      // 5. 신환 내원경로별 수납액 및 인원
-      const newPatientRoute = {};
-
-      for(let i=0; i<patientData.length; i++) {
-        const chartNo = patientData[i][3]; // D열: 차트번호
-        const feeRaw = patientData[i][12];  // M열: 수납액
-        if(!chartNo) continue;
-        const fee = feeRaw ? parseInt(feeRaw.toString().replace(/[^\d]/g,'')) || 0 : 0;
-
-        const dailyInfo = dailyMap.get(chartNo.toString());
-        if(!dailyInfo) continue;
-
-        const age = getAgeFromRRN(dailyInfo.rrn);
-        if(age === null) continue;
-        const ag = getAgeGroup(age);
-        if(!ag) continue;
-
-        const gender = getGenderFromRRN(dailyInfo.rrn);
-        if(!gender) continue;
-
-        // 1. 연령별 성별 수납액/인원 합산
-        ageSexSum[ag][gender] += fee;
-        ageSexCount[ag][gender]++;
-
-        // 2,3. 시간대별 연령, 성별 내원 수
-        const timeGroup = dailyInfo.time ? `${dailyInfo.time.getHours()}:00~${dailyInfo.time.getHours()+1}:00` : '기타';
-        if(!timeAgeCount[timeGroup]) timeAgeCount[timeGroup] = {};
-        if(!timeAgeCount[timeGroup][ag]) timeAgeCount[timeGroup][ag] = 0;
-        timeAgeCount[timeGroup][ag]++;
-
-        if(!timeSexCount[timeGroup]) timeSexCount[timeGroup] = { 남자:0, 여자:0 };
-        timeSexCount[timeGroup][gender]++;
-
-        // 4. 신환/재진 인원 집계
-        const pTypeRaw = dailyInfo.patientType || '';
-        let pType = null;
-        if(['신환','90일초진'].includes(pTypeRaw)) pType = '신환';
-        else if(['재진','물리치료내원','진찰료산정안함'].includes(pTypeRaw)) pType = '재진';
-        else pType = '재진'; // 공란 등 모두 재진 처리
-
-        patientTypeCount[pType]++;
-
-        // 5. 신환 내원경로별 수납액 및 인원
-        if(pType === '신환') {
-          const route = routeMap.get(chartNo.toString()) || '무응답';
-          if(!newPatientRoute[route]) newPatientRoute[route] = { 수납액:0, 인원:0 };
-          newPatientRoute[route].수납액 += fee;
-          newPatientRoute[route].인원++;
-        }
-      }
-
-      // 결과 표시
-      document.getElementById('results').style.display = 'block';
-
-      // 1. 연령대별 수납액(성별 포함)
-      const tbodyAgeSex = document.querySelector('#ageSexTable tbody');
-      tbodyAgeSex.innerHTML = '';
-      let totalFee = 0, totalMale = 0, totalFemale = 0;
-      ageGroups.forEach(ag=>{
-        const maleFee = ageSexSum[ag].남자;
-        const femaleFee = ageSexSum[ag].여자;
-        const sumFee = maleFee + femaleFee;
-        totalFee += sumFee; totalMale += maleFee; totalFemale += femaleFee;
-        const tr = `<tr><td>${ag}</td><td>${formatNumber(maleFee)}</td><td>${formatNumber(femaleFee)}</td><td>${formatNumber(sumFee)}</td></tr>`;
-        tbodyAgeSex.insertAdjacentHTML('beforeend', tr);
-      });
-      tbodyAgeSex.insertAdjacentHTML('beforeend', `<tr style="font-weight:bold"><td>합계</td><td>${formatNumber(totalMale)}</td><td>${formatNumber(totalFemale)}</td><td>${formatNumber(totalFee)}</td></tr>`);
-
-      // 2. 시간대별 연령 통계
-      const tbodyTimeAge = document.querySelector('#timeAgeTable tbody');
-      tbodyTimeAge.innerHTML = '';
-      Object.keys(timeAgeCount).sort().forEach(timeG=>{
-        const counts = timeAgeCount[timeG];
-        const tr = `<tr><td>${timeG}</td>${ageGroups.map(ag=>`<td>${counts[ag]||0}</td>`).join('')}</tr>`;
-        tbodyTimeAge.insertAdjacentHTML('beforeend', tr);
-      });
-
-      // 3. 시간대별 성별 내원 통계
-      const tbodyTimeSex = document.querySelector('#timeSexTable tbody');
-      tbodyTimeSex.innerHTML = '';
-      Object.keys(timeSexCount).sort().forEach(timeG=>{
-        const counts = timeSexCount[timeG];
-        const sum = (counts.남자||0) + (counts.여자||0);
-        const tr = `<tr><td>${timeG}</td><td>${counts.남자||0}</td><td>${counts.여자||0}</td><td>${sum}</td></tr>`;
-        tbodyTimeSex.insertAdjacentHTML('beforeend', tr);
-      });
-
-      // 4. 신환/재진 인원 통계
-      const tbodyPatientType = document.querySelector('#patientTypeTable tbody');
-      tbodyPatientType.innerHTML = '';
-      ['신환','재진'].forEach(tp=>{
-        const tr = `<tr><td>${tp}</td><td>${patientTypeCount[tp]||0}</td></tr>`;
-        tbodyPatientType.insertAdjacentHTML('beforeend', tr);
-      });
-
-      // 5. 신환 내원경로별 수납액 및 평균
-      const tbodyRoute = document.querySelector('#newPatientRouteTable tbody');
-      tbodyRoute.innerHTML = '';
-      let totalRouteFee = 0, totalRouteCnt = 0;
-      Object.entries(newPatientRoute).forEach(([route,data])=>{
-        const avg = data.인원 > 0 ? Math.round(data.수납액 / data.인원) : 0;
-        totalRouteFee += data.수납액;
-        totalRouteCnt += data.인원;
-        const tr = `<tr><td>${route}</td><td>${formatNumber(data.수납액)}</td><td>${formatNumber(avg)}</td><td>${data.인원}</td></tr>`;
-        tbodyRoute.insertAdjacentHTML('beforeend', tr);
-      });
-      tbodyRoute.insertAdjacentHTML('beforeend', `<tr style="font-weight:bold"><td>합계</td><td>${formatNumber(totalRouteFee)}</td><td>-</td><td>${totalRouteCnt}</td></tr>`);
-
-    });
-  </script>
 </body>
 </html>
